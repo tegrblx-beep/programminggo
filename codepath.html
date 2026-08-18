@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodePath</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1b1e2b;
+    --bg-soft:#20243349;
+    --elev:#242837;
+    --elev2:#2e3346;
+    --elev3:#383e56;
+    --border:#3a3f58;
+    --text:#edf0f8;
+    --text-muted:#9498b3;
+    --text-dim:#6b6f8a;
+    --accent:#7c89f7;
+    --accent-dark:#242a52;
+    --accent-text:#c7cdfd;
+    --gold:#f4b860;
+    --gold-dark:#4a3311;
+    --gold-text:#f9d59e;
+    --mint:#6fcf97;
+    --mint-dark:#173b28;
+    --mint-text:#a9e6c3;
+    --coral:#f2726f;
+    --coral-dark:#4a1d1c;
+    --coral-text:#f8b3b1;
+    --radius:16px;
+    --font-display:'JetBrains Mono', monospace;
+    --font-body:'Plus Jakarta Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,textarea,select{font-family:inherit;color:inherit;}
+  button{cursor:pointer;}
+  h1,h2,h3,h4{font-family:var(--font-display);margin:0;letter-spacing:-0.01em;}
+  p{margin:0;}
+  ::selection{background:var(--accent);color:#fff;}
+  a{color:var(--accent-text);}
+
+  #app{max-width:900px;margin:0 auto;padding:0 16px 64px;min-height:100vh;}
+
+  .loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px;}
+  .spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--elev3);border-top-color:var(--accent);animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* topbar */
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 0;background:linear-gradient(var(--bg) 80%, transparent);gap:12px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--elev2);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;
+    color:var(--accent-text);font-size:14px;}
+  .brand-name{font-family:var(--font-display);font-weight:800;font-size:16px;}
+  .brand-name span{color:var(--accent-text);}
+  .top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .xp-pill{display:flex;align-items:center;gap:6px;background:var(--gold-dark);color:var(--gold-text);
+    border:1px solid #6b4c1c;border-radius:999px;padding:6px 12px;font-family:var(--font-display);font-size:13px;font-weight:600;}
+  .mode-switch{display:flex;background:var(--elev);border:1px solid var(--border);border-radius:999px;padding:3px;}
+  .mode-switch button{border:none;background:transparent;color:var(--text-muted);padding:7px 16px;border-radius:999px;
+    font-size:13px;font-weight:600;font-family:var(--font-body);transition:all .15s;}
+  .mode-switch button.active{background:var(--accent);color:#fff;}
+
+  /* buttons */
+  .btn{border:1px solid var(--border);background:var(--elev2);color:var(--text);padding:10px 18px;border-radius:12px;
+    font-weight:600;font-size:14px;transition:transform .1s, background .15s, border-color .15s;}
+  .btn:hover{background:var(--elev3);border-color:var(--text-dim);}
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn-primary:hover{background:#6d79e6;border-color:#6d79e6;}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  .btn-success{background:var(--mint);border-color:var(--mint);color:#0e2a1a;}
+  .btn-success:hover{background:#63bd88;}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--text-muted);}
+  .btn-ghost:hover{background:var(--elev);color:var(--text);}
+  .btn-danger{background:transparent;border-color:var(--coral);color:var(--coral);}
+  .btn-danger:hover{background:var(--coral-dark);}
+  .btn-sm{padding:6px 12px;font-size:13px;border-radius:9px;}
+  .btn-block{width:100%;}
+  .btn-icon{width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;}
+
+  /* cards / misc */
+  .card{background:var(--elev);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+  .muted{color:var(--text-muted);}
+  .dim{color:var(--text-dim);}
+  .mono{font-family:var(--font-display);}
+  .empty-state{text-align:center;padding:48px 20px;color:var(--text-muted);}
+  .empty-state h3{color:var(--text);font-size:16px;margin-bottom:8px;}
+  .empty-state p{font-size:14px;line-height:1.6;margin-bottom:16px;}
+
+  /* language grid */
+  .lang-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px,1fr));gap:14px;margin-top:18px;}
+  .lang-card{background:var(--elev);border:1px solid var(--border);border-radius:var(--radius);padding:20px 14px;
+    text-align:center;transition:border-color .15s, transform .1s;}
+  .lang-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .lang-glyph{width:52px;height:52px;border-radius:14px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-weight:800;font-size:16px;}
+  .lang-name{font-weight:700;font-size:14px;margin-bottom:4px;}
+  .lang-progress-track{height:5px;background:var(--elev3);border-radius:999px;overflow:hidden;margin-top:10px;}
+  .lang-progress-fill{height:100%;background:var(--mint);}
+
+  /* path view */
+  .path-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap;}
+  .path-header-left{display:flex;align-items:center;gap:12px;}
+  .section-block{margin-bottom:36px;}
+  .section-title{display:flex;align-items:baseline;gap:10px;margin-bottom:22px;padding-bottom:12px;border-bottom:1px dashed var(--border);}
+  .section-num{font-family:var(--font-display);color:var(--text-dim);font-size:13px;}
+  .section-title h3{font-size:18px;}
+  .section-desc{color:var(--text-muted);font-size:13px;margin-top:4px;}
+  .lesson-path{display:flex;flex-direction:column;align-items:center;gap:0;}
+  .lesson-row{display:flex;flex-direction:column;align-items:center;}
+  .node-connector{width:2px;height:20px;background-image:linear-gradient(var(--border) 60%, transparent 40%);background-size:2px 8px;}
+  .node-connector.filled{background-image:none;background-color:var(--mint);}
+  .node-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .node{width:64px;height:64px;border-radius:50%;border:2px solid var(--border);background:var(--elev2);
+    display:flex;align-items:center;justify-content:center;position:relative;transition:transform .12s;}
+  .node[data-clickable="1"]{cursor:pointer;}
+  .node[data-clickable="1"]:hover{transform:scale(1.06);}
+  .node .ni{font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--text-muted);}
+  .node.locked{opacity:.5;}
+  .node.locked .ni{color:var(--text-dim);}
+  .node.completed{background:var(--mint-dark);border-color:var(--mint);}
+  .node.completed .ni{color:var(--mint-text);}
+  .node.current{background:var(--accent-dark);border-color:var(--accent);box-shadow:0 0 0 5px var(--accent-dark);}
+  .node.current .ni{color:var(--accent-text);}
+  .node-cursor{position:absolute;top:-14px;font-family:var(--font-display);color:var(--accent-text);font-size:14px;
+    animation:blink 1.1s step-end infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  .node-label{font-size:12px;font-weight:600;text-align:center;max-width:110px;color:var(--text-muted);}
+  .node-label.on{color:var(--text);}
+
+  /* lesson player */
+  .player-overlay{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;overflow-y:auto;}
+  .player-inner{max-width:640px;margin:0 auto;width:100%;padding:20px 20px 40px;flex:1;display:flex;flex-direction:column;}
+  .player-top{display:flex;align-items:center;gap:14px;margin-bottom:32px;}
+  .progress-track{flex:1;height:12px;background:var(--elev2);border-radius:999px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:999px;transition:width .25s ease;}
+  .part-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:20px;}
+  .part-kicker{font-family:var(--font-display);color:var(--text-dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+  .part-prompt{font-size:20px;font-weight:700;line-height:1.4;}
+  .code-block{background:var(--elev);border:1px solid var(--border);border-radius:12px;padding:16px;font-family:var(--font-display);
+    font-size:14px;line-height:1.7;color:var(--gold-text);white-space:pre-wrap;overflow-x:auto;}
+  .code-block input.blank{font-family:var(--font-display);font-size:14px;background:var(--elev3);color:var(--text);
+    border:1px solid var(--accent);border-radius:6px;padding:2px 8px;width:140px;}
+  .option-list{display:flex;flex-direction:column;gap:10px;}
+  .option{border:2px solid var(--border);background:var(--elev);border-radius:12px;padding:14px 16px;text-align:left;
+    font-size:15px;font-weight:600;transition:border-color .12s, background .12s;}
+  .option:hover{border-color:var(--text-dim);}
+  .option.selected{border-color:var(--accent);background:var(--accent-dark);}
+  .option.correct{border-color:var(--mint);background:var(--mint-dark);}
+  .option.wrong{border-color:var(--coral);background:var(--coral-dark);}
+  .tf-row{display:flex;gap:12px;}
+  .tf-row .option{flex:1;text-align:center;}
+  .chip-pool{display:flex;flex-wrap:wrap;gap:8px;min-height:44px;}
+  .chip{font-family:var(--font-display);font-size:13px;background:var(--elev2);border:1px solid var(--border);
+    border-radius:8px;padding:8px 12px;}
+  .chip.pool-chip:hover{border-color:var(--accent);}
+  .order-target{background:var(--elev);border:1px dashed var(--border);border-radius:12px;padding:12px;min-height:56px;
+    display:flex;flex-direction:column;gap:6px;}
+  .order-line{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:13px;background:var(--elev2);
+    border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
+  .order-line .oi{color:var(--text-dim);width:16px;}
+  .order-line.bug-line{border-color:var(--border);}
+  .order-line.bug-line.selected{border-color:var(--accent);background:var(--accent-dark);}
+  .order-line.bug-line.correct{border-color:var(--mint);background:var(--mint-dark);}
+  .order-line.bug-line.wrong{border-color:var(--coral);background:var(--coral-dark);}
+  .text-input{font-family:var(--font-display);font-size:15px;background:var(--elev);color:var(--text);
+    border:2px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;}
+  .text-input:focus{border-color:var(--accent);outline:none;}
+  .feedback-bar{display:flex;align-items:center;gap:10px;border-radius:12px;padding:14px 16px;margin-top:16px;font-weight:700;}
+  .feedback-bar.ok{background:var(--mint-dark);color:var(--mint-text);}
+  .feedback-bar.bad{background:var(--coral-dark);color:var(--coral-text);}
+  .feedback-sub{font-weight:400;font-size:13px;margin-top:4px;color:var(--text-muted);}
+  .player-footer{margin-top:24px;}
+  .info-body{color:var(--text-muted);font-size:15px;line-height:1.7;}
+
+  .complete-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;}
+  .complete-badge{width:96px;height:96px;border-radius:50%;background:var(--mint-dark);border:2px solid var(--mint);
+    display:flex;align-items:center;justify-content:center;font-size:38px;}
+  .complete-stats{display:flex;gap:14px;}
+  .stat-box{background:var(--elev);border:1px solid var(--border);border-radius:12px;padding:14px 22px;min-width:100px;}
+  .stat-box .v{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--gold-text);}
+  .stat-box .l{font-size:12px;color:var(--text-muted);margin-top:2px;}
+
+  /* create mode */
+  .create-tabs{display:flex;gap:8px;margin:18px 0 22px;}
+  .create-tabs button{border:1px solid var(--border);background:var(--elev);color:var(--text-muted);padding:9px 16px;
+    border-radius:10px;font-weight:600;font-size:13px;}
+  .create-tabs button.active{background:var(--elev2);color:var(--text);border-color:var(--accent);}
+  .breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;color:var(--text-muted);margin-bottom:18px;}
+  .breadcrumb button{background:transparent;border:none;color:var(--text-muted);font-size:13px;font-weight:600;padding:2px 0;}
+  .breadcrumb button:hover{color:var(--accent-text);}
+  .breadcrumb .sep{color:var(--text-dim);}
+  .breadcrumb .cur{color:var(--text);font-weight:700;}
+  .entity-row{display:flex;align-items:center;gap:10px;background:var(--elev);border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;margin-bottom:10px;}
+  .entity-row .grip{color:var(--text-dim);font-family:var(--font-display);font-size:12px;}
+  .entity-row .main{flex:1;min-width:0;}
+  .entity-row .main .t{font-weight:700;font-size:14px;}
+  .entity-row .main .s{font-size:12px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entity-row .acts{display:flex;gap:4px;flex-shrink:0;}
+  .form-panel{background:var(--elev);border:1px solid var(--accent);border-radius:14px;padding:18px;margin-bottom:18px;}
+  .form-panel h4{font-size:14px;margin-bottom:14px;color:var(--accent-text);}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;}
+  .field input[type=text], .field textarea, .field select{width:100%;background:var(--elev2);border:1px solid var(--border);
+    border-radius:9px;padding:10px 12px;font-size:14px;}
+  .field textarea{resize:vertical;min-height:70px;font-family:var(--font-display);}
+  .field-hint{font-size:12px;color:var(--text-dim);margin-top:5px;}
+  .field-row{display:flex;gap:12px;}
+  .field-row .field{flex:1;}
+  .color-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .color-dot{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+  .color-dot.sel{border-color:#fff;}
+  .form-actions{display:flex;gap:10px;margin-top:16px;}
+  .option-edit-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .option-edit-row input[type=text]{flex:1;}
+  .radio-row{display:flex;align-items:center;gap:8px;}
+
+  .code-editor-wrap{background:var(--elev);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .code-editor-wrap textarea{width:100%;min-height:360px;background:var(--elev2);border:1px solid var(--border);
+    border-radius:10px;padding:14px;font-family:var(--font-display);font-size:12.5px;line-height:1.6;color:var(--text);}
+  .code-error{background:var(--coral-dark);color:var(--coral-text);border-radius:10px;padding:10px 14px;font-size:13px;margin-top:10px;font-family:var(--font-display);}
+  .schema-help{margin-top:16px;}
+  .schema-help summary{cursor:pointer;color:var(--accent-text);font-size:13px;font-weight:600;}
+  .schema-help pre{background:var(--elev2);border:1px solid var(--border);border-radius:10px;padding:14px;
+    font-size:11.5px;overflow-x:auto;margin-top:10px;color:var(--text-muted);line-height:1.6;}
+
+  .confirm-bar{position:fixed;left:0;right:0;bottom:0;background:var(--elev2);border-top:1px solid var(--coral);
+    padding:14px 20px;display:flex;align-items:center;justify-content:center;gap:16px;z-index:200;flex-wrap:wrap;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--elev3);border:1px solid var(--border);
+    padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+
+  @media(max-width:560px){
+    .topbar{padding:12px 0;}
+    .brand-name{font-size:14px;}
+    .node{width:56px;height:56px;}
+    .lang-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
+    .field-row{flex-direction:column;gap:0;}
+    .complete-stats{flex-wrap:wrap;justify-content:center;}
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-screen"><div class="spinner"></div><p class="muted mono" style="font-size:13px;">loading codepath...</p></div></div>
+
+<script>
+/* ---------- ids / helpers ---------- */
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ---------- focus preservation across re-renders ---------- */
+/* Every re-render replaces innerHTML, which normally drops focus out of any
+   text input the person is typing in. To fix that, we tag focusable fields
+   with data-focus-key, remember which one (and cursor position) was focused
+   right before a render, then refocus + restore the cursor right after. */
+function captureFocus(){
+  const el=document.activeElement;
+  if(!el || !el.getAttribute) return null;
+  const key=el.getAttribute('data-focus-key');
+  if(!key) return null;
+  let start=null, end=null;
+  try{ start=el.selectionStart; end=el.selectionEnd; }catch(e){}
+  return {key,start,end};
+}
+function restoreFocus(info){
+  if(!info) return;
+  let sel;
+  try{ sel=`[data-focus-key="${info.key.replace(/"/g,'\\"')}"]`; }catch(e){ return; }
+  const el=document.querySelector(sel);
+  if(!el) return;
+  el.focus();
+  if(typeof info.start==='number' && el.setSelectionRange){
+    try{ el.setSelectionRange(info.start,info.end); }catch(e){}
+  }
+}
+
+/* ---------- seed data ---------- */
+function seedData(){
+  return { languages: [] };
+}
+
+/* ---------- storage ---------- */
+const DKEY='cp_curriculum_v1', PKEY='cp_progress_v1';
+async function loadData(){
+  try{const r=await window.storage.get(DKEY,false); return r? JSON.parse(r.value): seedData();}
+  catch(e){return seedData();}
+}
+async function loadProgress(){
+  try{const r=await window.storage.get(PKEY,false); return r? JSON.parse(r.value): {xp:0,completed:{}};}
+  catch(e){return {xp:0,completed:{}};}
+}
+async function saveData(){
+  try{await window.storage.set(DKEY, JSON.stringify(state.data), false);}catch(e){toast('Could not save changes');}
+}
+async function saveProgress(){
+  try{await window.storage.set(PKEY, JSON.stringify(state.progress), false);}catch(e){}
+}
+
+/* ---------- state ---------- */
+let state={
+  data:null, progress:null, view:'learn', createTab:'builder',
+  currentLanguageId:null, builderPath:{languageId:null,sectionId:null,lessonId:null},
+  editing:null, pendingDelete:null, player:null, codeDraft:null, codeError:null
+};
+
+function toast(msg){
+  let t=document.getElementById('toastEl');
+  if(!t){t=document.createElement('div');t.id='toastEl';t.className='toast';document.body.appendChild(t);}
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+const COLORS={
+  blue:{main:'#7c89f7',bg:'#242a52',text:'#c7cdfd'},
+  gold:{main:'#f4b860',bg:'#4a3311',text:'#f9d59e'},
+  mint:{main:'#6fcf97',bg:'#173b28',text:'#a9e6c3'},
+  coral:{main:'#f2726f',bg:'#4a1d1c',text:'#f8b3b1'},
+  pink:{main:'#e88ad0',bg:'#4a2242',text:'#f4c3e6'}
+};
+function colorOf(key){return COLORS[key]||COLORS.blue;}
+
+/* ---------- data lookups ---------- */
+function getLang(id){return state.data.languages.find(l=>l.id===id);}
+function getSection(lang,id){return lang.sections.find(s=>s.id===id);}
+function getLesson(section,id){return section.lessons.find(l=>l.id===id);}
+function flatLessons(lang){
+  const out=[];
+  lang.sections.forEach(sec=>sec.lessons.forEach(les=>out.push({sectionId:sec.id,lesson:les})));
+  return out;
+}
+function isCompleted(langId,lessonId){return !!(state.progress.completed[langId]&&state.progress.completed[langId][lessonId]);}
+function langCompletedCount(lang){return flatLessons(lang).filter(x=>isCompleted(lang.id,x.lesson.id)).length;}
+function unlockedSet(lang){
+  const flat=flatLessons(lang); const unlocked=new Set(); let prevDone=true;
+  for(const item of flat){
+    const done=isCompleted(lang.id,item.lesson.id);
+    if(prevDone) unlocked.add(item.lesson.id);
+    prevDone=done;
+  }
+  return unlocked;
+}
+
+/* ---------- render root ---------- */
+function render(){
+  const focusInfo=captureFocus();
+  const app=document.getElementById('app');
+  let html='';
+  html+=renderTopbar();
+  if(state.view==='learn'){
+    html+= state.currentLanguageId ? renderPath() : renderLanguagePicker();
+  } else {
+    html+= renderCreate();
+  }
+  app.innerHTML=html;
+  if(state.pendingDelete) renderConfirmBar(); else removeConfirmBar();
+  if(state.player) renderPlayer(); else removePlayerOverlay();
+  restoreFocus(focusInfo);
+}
+function removePlayerOverlay(){const o=document.getElementById('playerOverlay'); if(o) o.remove();}
+
+function renderTopbar(){
+  return `
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">&lt;/&gt;</div>
+      <div class="brand-name">code<span>path</span></div>
+    </div>
+    <div class="top-actions">
+      <div class="xp-pill">&#9733; ${state.progress.xp} XP</div>
+      <div class="mode-switch">
+        <button class="${state.view==='learn'?'active':''}" onclick="setView('learn')">Learn</button>
+        <button class="${state.view==='create'?'active':''}" onclick="setView('create')">Create</button>
+      </div>
+    </div>
+  </div>`;
+}
+function setView(v){state.view=v; if(v==='learn'){} render();}
+
+/* ---------- learn: language picker ---------- */
+function renderLanguagePicker(){
+  const langs=state.data.languages;
+  let cards=langs.map(l=>{
+    const c=colorOf(l.color); const total=flatLessons(l).length; const done=langCompletedCount(l);
+    const pct= total? Math.round(done/total*100):0;
+    return `<div class="lang-card" onclick="openLanguage('${l.id}')">
+      <div class="lang-glyph" style="background:${c.bg};color:${c.text};">${esc(l.icon||l.name.slice(0,2).toUpperCase())}</div>
+      <div class="lang-name">${esc(l.name)}</div>
+      <div class="dim" style="font-size:11px;">${done}/${total} lessons</div>
+      <div class="lang-progress-track"><div class="lang-progress-fill" style="width:${pct}%;"></div></div>
+    </div>`;
+  }).join('');
+  if(!langs.length){
+    return `<div class="empty-state">
+      <h3>No languages yet</h3>
+      <p>Head to Create to add your first programming language and build out its lesson path.</p>
+      <button class="btn btn-primary" onclick="setView('create')">Go to Create</button>
+    </div>`;
+  }
+  return `<h2 style="font-size:20px;margin-bottom:4px;">Pick a language</h2>
+  <p class="muted" style="font-size:14px;">Your progress is saved as you go.</p>
+  <div class="lang-grid">${cards}</div>`;
+}
+function openLanguage(id){state.currentLanguageId=id; render();}
+
+/* ---------- learn: path ---------- */
+function renderPath(){
+  const lang=getLang(state.currentLanguageId);
+  if(!lang){state.currentLanguageId=null; return renderLanguagePicker();}
+  const c=colorOf(lang.color);
+  const unlocked=unlockedSet(lang);
+  const total=flatLessons(lang).length, done=langCompletedCount(lang);
+
+  let sectionsHtml='';
+  if(!lang.sections.length){
+    sectionsHtml=`<div class="empty-state"><h3>No sections yet</h3><p>Add sections and lessons for ${esc(lang.name)} in Create.</p></div>`;
+  }
+  lang.sections.forEach((sec,si)=>{
+    let nodesHtml='';
+    if(!sec.lessons.length){
+      nodesHtml=`<p class="dim" style="font-size:13px;">No lessons in this section yet.</p>`;
+    }
+    sec.lessons.forEach((les,li)=>{
+      const completed=isCompleted(lang.id,les.id);
+      const isUnlocked=unlocked.has(les.id);
+      const flat=flatLessons(lang);
+      const idxInFlat=flat.findIndex(x=>x.lesson.id===les.id);
+      const isFrontier = isUnlocked && !completed;
+      let cls='node'+(completed?' completed':(isUnlocked?' current':' locked'));
+      const clickable= isUnlocked;
+      if(li>0){
+        nodesHtml+=`<div class="node-connector ${sec.lessons[li-1] && isCompleted(lang.id,sec.lessons[li-1].id)?'filled':''}"></div>`;
+      }
+      nodesHtml+=`<div class="node-wrap">
+        <div class="${cls}" data-clickable="${clickable?1:0}" ${clickable?`onclick="startLesson('${lang.id}','${sec.id}','${les.id}')"`:''}>
+          ${isFrontier?'<div class="node-cursor">&#9608;</div>':''}
+          <span class="ni">${completed?'&#10003;':(li+1)}</span>
+        </div>
+        <div class="node-label ${isUnlocked?'on':''}">${esc(les.title)}</div>
+      </div>`;
+    });
+    sectionsHtml+=`<div class="section-block">
+      <div class="section-title">
+        <span class="section-num mono">SEC ${si+1}</span>
+        <div>
+          <h3>${esc(sec.title)}</h3>
+          ${sec.description?`<div class="section-desc">${esc(sec.description)}</div>`:''}
+        </div>
+      </div>
+      <div class="lesson-path">${nodesHtml}</div>
+    </div>`;
+  });
+
+  return `
+  <div class="path-header">
+    <div class="path-header-left">
+      <div class="lang-glyph" style="background:${c.bg};color:${c.text};width:44px;height:44px;font-size:13px;margin:0;">${esc(lang.icon||'')}</div>
+      <div>
+        <h2 style="font-size:19px;">${esc(lang.name)}</h2>
+        <span class="dim" style="font-size:12px;">${done}/${total} lessons complete</span>
+      </div>
+    </div>
+    <button class="btn btn-sm" onclick="backToLanguages()">Change language</button>
+  </div>
+  ${sectionsHtml}`;
+}
+function backToLanguages(){state.currentLanguageId=null; render();}
+
+/* ---------- lesson player ---------- */
+function startLesson(langId,sectionId,lessonId){
+  const lang=getLang(langId), sec=getSection(lang,sectionId), les=getLesson(sec,lessonId);
+  state.player={langId,sectionId,lessonId,parts:les.parts,title:les.title,partIndex:0,
+    correctCount:0,checkableCount:les.parts.filter(p=>p.type!=='info').length,
+    checked:false,wasCorrect:null,transient:{},finished:false,
+    redemption:false,round:1,wrongQueue:[]};
+  enterPart(0);
+  render();
+}
+function enterPart(i){
+  const p=state.player; if(!p) return;
+  p.partIndex=i; p.checked=false; p.wasCorrect=null;
+  const part=p.parts[i];
+  p.transient={};
+  if(part && part.type==='order'){p.transient.pool=shuffle(part.lines); p.transient.placed=[];}
+  if(part && part.type==='fill'){p.transient.value='';}
+  if(part && part.type==='mcq'){p.transient.selected=null;}
+  if(part && part.type==='truefalse'){p.transient.selected=null;}
+  if(part && part.type==='multiselect'){p.transient.selected=[];}
+  if(part && part.type==='shortanswer'){p.transient.value='';}
+  if(part && part.type==='spotbug'){p.transient.selected=null;}
+  if(part && part.type==='match'){
+    p.transient.rightOrder=shuffle(part.pairs.map((pr,idx)=>idx));
+    p.transient.matched={};
+    p.transient.selectedLeft=null;
+  }
+}
+function exitPlayer(){state.player=null; render();}
+
+function renderPlayer(){
+  let overlay=document.getElementById('playerOverlay');
+  if(!overlay){overlay=document.createElement('div'); overlay.id='playerOverlay'; overlay.className='player-overlay'; document.body.appendChild(overlay);}
+  const p=state.player;
+  const pct= p.finished?100:Math.round((p.partIndex)/p.parts.length*100);
+  let bodyHtml='';
+  if(p.finished){
+    const acc= p.checkableCount? Math.round(p.correctCount/p.checkableCount*100):100;
+    bodyHtml=`<div class="complete-screen">
+      <div class="complete-badge">&#127881;</div>
+      <h2 style="font-size:22px;">Lesson complete</h2>
+      <p class="muted">${esc(p.title)}</p>
+      <div class="complete-stats">
+        <div class="stat-box"><div class="v">+${p.xpGained}</div><div class="l">XP earned</div></div>
+        <div class="stat-box"><div class="v">${acc}%</div><div class="l">Accuracy</div></div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="exitPlayer()">Continue</button>
+    </div>`;
+  } else {
+    const part=p.parts[p.partIndex];
+    const redemptionBanner = p.redemption
+      ? `<div class="feedback-bar bad" style="margin-bottom:4px;">&#128260; Redemption round <div class="feedback-sub">Fix what you missed to finish the lesson.</div></div>`
+      : '';
+    bodyHtml=`${redemptionBanner}<div class="part-body">${renderPart(part)}</div>
+    <div class="player-footer">${renderPlayerFooter(part)}</div>`;
+  }
+  overlay.innerHTML=`<div class="player-inner">
+    <div class="player-top">
+      <button class="btn btn-ghost btn-icon" onclick="requestExitPlayer()">&#10005;</button>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%;"></div></div>
+    </div>
+    ${bodyHtml}
+  </div>`;
+}
+function requestExitPlayer(){
+  state.pendingDelete={kind:'exitPlayer',label:'Leave this lesson? Your progress on it will not be saved.'};
+  render();
+}
+
+function renderPart(part){
+  if(part.type==='info'){
+    return `<div class="part-kicker">Read</div>
+      <div class="part-prompt">${esc(part.title)}</div>
+      <div class="info-body">${esc(part.body)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}`;
+  }
+  if(part.type==='mcq'){
+    const sel=state.player.transient.selected;
+    const checked=state.player.checked;
+    const opts=part.options.map((o,i)=>{
+      let cls='option';
+      if(checked){
+        if(i===part.correctIndex) cls+=' correct';
+        else if(i===sel) cls+=' wrong';
+      } else if(i===sel) cls+=' selected';
+      return `<button class="${cls}" ${checked?'disabled':''} onclick="selectMcq(${i})">${esc(o)}</button>`;
+    }).join('');
+    return `<div class="part-kicker">Choose one</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
+      <div class="option-list">${opts}</div>`;
+  }
+  if(part.type==='fill'){
+    const segs=(part.code||'').split('___');
+    const codeHtml = segs.length>1
+      ? `${esc(segs[0])}<input class="blank" id="fillInput" type="text" value="${esc(state.player.transient.value||'')}" oninput="onFillInput(this.value)" ${state.player.checked?'disabled':''}>${esc(segs.slice(1).join('___'))}`
+      : esc(part.code||'');
+    return `<div class="part-kicker">Fill in the blank</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <div class="code-block">${codeHtml}</div>
+      ${part.hint?`<div class="dim" style="font-size:12px;">Hint: ${esc(part.hint)}</div>`:''}`;
+  }
+  if(part.type==='truefalse'){
+    const sel=state.player.transient.selected;
+    const checked=state.player.checked;
+    function optCls(val){
+      let cls='option';
+      if(checked){
+        if(val===part.answer) cls+=' correct';
+        else if(val===sel) cls+=' wrong';
+      } else if(val===sel) cls+=' selected';
+      return cls;
+    }
+    return `<div class="part-kicker">True or false</div>
+      <div class="part-prompt">${esc(part.statement)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
+      <div class="tf-row">
+        <button class="${optCls(true)}" ${checked?'disabled':''} onclick="selectTf(true)">True</button>
+        <button class="${optCls(false)}" ${checked?'disabled':''} onclick="selectTf(false)">False</button>
+      </div>`;
+  }
+  if(part.type==='order'){
+    const pool=state.player.transient.pool||[];
+    const placed=state.player.transient.placed||[];
+    const checked=state.player.checked;
+    const poolHtml=pool.map((line,i)=>`<button class="chip pool-chip" ${checked?'disabled':''} onclick="placeChip(${i})">${esc(line)}</button>`).join('')
+      || '<span class="dim" style="font-size:12px;">All lines placed</span>';
+    const placedHtml=placed.map((line,i)=>`<div class="order-line" ${checked?'':'onclick="unplaceChip('+i+')"'} style="${checked?'':'cursor:pointer;'}">
+      <span class="oi">${i+1}</span><span>${esc(line)}</span></div>`).join('')
+      || '<span class="dim" style="font-size:12px;">Tap lines below to build the order</span>';
+    return `<div class="part-kicker">Put it in order</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <div class="order-target">${placedHtml}</div>
+      <div class="chip-pool">${poolHtml}</div>`;
+  }
+  if(part.type==='match'){
+    const t=state.player.transient;
+    const checked=state.player.checked;
+    const leftHtml=part.pairs.map((pr,i)=>{
+      let cls='option';
+      const isMatched= t.matched[i]!==undefined;
+      if(checked){
+        if(isMatched && t.matched[i]===i) cls+=' correct';
+        else if(isMatched) cls+=' wrong';
+      } else if(isMatched || t.selectedLeft===i) cls+=' selected';
+      return `<button class="${cls}" ${checked?'disabled':''} onclick="matchTapLeft(${i})">${esc(pr.left)}</button>`;
+    }).join('');
+    const rightHtml=(t.rightOrder||[]).map(ri=>{
+      const pr=part.pairs[ri];
+      const matchedLeft=Object.keys(t.matched).find(l=>t.matched[l]===ri);
+      let cls='option';
+      if(checked){
+        if(matchedLeft!==undefined && Number(matchedLeft)===ri) cls+=' correct';
+        else if(matchedLeft!==undefined) cls+=' wrong';
+      } else if(matchedLeft!==undefined) cls+=' selected';
+      return `<button class="${cls}" ${checked?'disabled':''} onclick="matchTapRight(${ri})">${esc(pr.right)}</button>`;
+    }).join('');
+    return `<div class="part-kicker">Match the pairs</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <p class="dim" style="font-size:12px;">Tap an item on the left, then its match on the right. Tap a matched item to undo it.</p>
+      <div style="display:flex;gap:14px;">
+        <div class="option-list" style="flex:1;">${leftHtml}</div>
+        <div class="option-list" style="flex:1;">${rightHtml}</div>
+      </div>`;
+  }
+  if(part.type==='multiselect'){
+    const sel=state.player.transient.selected||[];
+    const checked=state.player.checked;
+    const opts=part.options.map((o,i)=>{
+      let cls='option';
+      const isCorrect=part.correctIndexes.includes(i);
+      const isSel=sel.includes(i);
+      if(checked){
+        if(isCorrect) cls+=' correct';
+        else if(isSel) cls+=' wrong';
+      } else if(isSel) cls+=' selected';
+      return `<button class="${cls}" ${checked?'disabled':''} onclick="toggleMultiselect(${i})">${isSel&&!checked?'&#10003; ':''}${esc(o)}</button>`;
+    }).join('');
+    return `<div class="part-kicker">Select all that apply</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
+      <div class="option-list">${opts}</div>`;
+  }
+  if(part.type==='shortanswer'){
+    const checked=state.player.checked;
+    return `<div class="part-kicker">Short answer</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <input type="text" class="text-input" id="shortAnswerInput" data-focus-key="short-answer" value="${esc(state.player.transient.value||'')}" oninput="onShortAnswerInput(this.value)" ${checked?'disabled':''} placeholder="Type your answer">`;
+  }
+  if(part.type==='spotbug'){
+    const sel=state.player.transient.selected;
+    const checked=state.player.checked;
+    const linesHtml=part.lines.map((line,i)=>{
+      let cls='order-line bug-line';
+      if(checked){
+        if(i===part.buggyIndex) cls+=' correct';
+        else if(i===sel) cls+=' wrong';
+      } else if(i===sel) cls+=' selected';
+      return `<div class="${cls}" style="cursor:${checked?'default':'pointer'};" ${checked?'':`onclick="selectBugLine(${i})"`}><span class="oi">${i+1}</span><span class="mono">${esc(line)}</span></div>`;
+    }).join('');
+    return `<div class="part-kicker">Spot the bug</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <p class="dim" style="font-size:12px;">Tap the line that has the bug.</p>
+      <div class="order-target">${linesHtml}</div>`;
+  }
+  return '';
+}
+function toggleMultiselect(i){
+  if(state.player.checked) return;
+  const t=state.player.transient;
+  t.selected = t.selected.includes(i) ? t.selected.filter(x=>x!==i) : [...t.selected,i];
+  render();
+}
+function onShortAnswerInput(v){
+  state.player.transient.value=v;
+  const btn=document.getElementById('checkBtn');
+  if(btn) btn.disabled = !(v||'').trim().length;
+}
+function selectBugLine(i){ if(state.player.checked) return; state.player.transient.selected=i; render(); }
+function matchTapLeft(i){
+  if(state.player.checked) return;
+  const t=state.player.transient;
+  if(t.matched[i]!==undefined){ delete t.matched[i]; render(); return; }
+  t.selectedLeft=i; render();
+}
+function matchTapRight(i){
+  if(state.player.checked) return;
+  const t=state.player.transient;
+  if(t.selectedLeft==null) return;
+  const used=Object.values(t.matched).includes(i);
+  if(used) return;
+  t.matched[t.selectedLeft]=i;
+  t.selectedLeft=null;
+  render();
+}
+
+function selectMcq(i){ if(state.player.checked) return; state.player.transient.selected=i; render(); }
+function selectTf(v){ if(state.player.checked) return; state.player.transient.selected=v; render(); }
+function onFillInput(v){
+  state.player.transient.value=v;
+  const btn=document.getElementById('checkBtn');
+  if(btn) btn.disabled = !(v||'').trim().length;
+}
+function placeChip(i){
+  const t=state.player.transient; const line=t.pool[i];
+  t.pool=t.pool.filter((_,idx)=>idx!==i); t.placed=[...t.placed,line]; render();
+}
+function unplaceChip(i){
+  const t=state.player.transient; const line=t.placed[i];
+  t.placed=t.placed.filter((_,idx)=>idx!==i); t.pool=[...t.pool,line]; render();
+}
+
+function canCheck(part){
+  const t=state.player.transient;
+  if(part.type==='mcq') return t.selected!=null;
+  if(part.type==='truefalse') return t.selected!=null;
+  if(part.type==='fill') return (t.value||'').trim().length>0;
+  if(part.type==='order') return (t.placed||[]).length===part.lines.length;
+  if(part.type==='match') return Object.keys(t.matched||{}).length===part.pairs.length;
+  if(part.type==='multiselect') return (t.selected||[]).length>0;
+  if(part.type==='shortanswer') return (t.value||'').trim().length>0;
+  if(part.type==='spotbug') return t.selected!=null;
+  return true;
+}
+function computeCorrect(part,t){
+  if(part.type==='mcq') return t.selected===part.correctIndex;
+  if(part.type==='truefalse') return t.selected===part.answer;
+  if(part.type==='fill') return (t.value||'').trim()===String(part.answer).trim();
+  if(part.type==='order') return JSON.stringify(t.placed)===JSON.stringify(part.lines);
+  if(part.type==='match') return part.pairs.every((pr,i)=>t.matched && t.matched[i]===i);
+  if(part.type==='multiselect'){
+    const sel=(t.selected||[]).slice().sort();
+    const correct=part.correctIndexes.slice().sort();
+    return JSON.stringify(sel)===JSON.stringify(correct);
+  }
+  if(part.type==='shortanswer'){
+    const given=(t.value||'').trim().toLowerCase();
+    return (part.answers||[]).some(a=>a.trim().toLowerCase()===given);
+  }
+  if(part.type==='spotbug') return t.selected===part.buggyIndex;
+  return true;
+}
+function renderPlayerFooter(part){
+  const p=state.player;
+  if(!p.checked){
+    if(part.type==='info'){
+      return `<button class="btn btn-primary btn-block" onclick="continuePart()">Continue</button>`;
+    }
+    const ok=canCheck(part);
+    return `<button id="checkBtn" class="btn btn-primary btn-block" ${ok?'':'disabled'} onclick="checkCurrent()">Check</button>`;
+  }
+  const fb = p.wasCorrect
+    ? `<div class="feedback-bar ok"><div>&#10003; Nice! <div class="feedback-sub">That's correct.</div></div></div>`
+    : `<div class="feedback-bar bad"><div>&#10005; Not quite <div class="feedback-sub">${answerHint(part)}</div></div></div>`;
+  const isLast = p.partIndex===p.parts.length-1;
+  return `${fb}<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="continuePart()">${isLast?'Finish':'Continue'}</button>`;
+}
+function answerHint(part){
+  if(part.type==='mcq') return 'Correct answer: '+esc(part.options[part.correctIndex]);
+  if(part.type==='fill') return 'Correct answer: '+esc(part.answer);
+  if(part.type==='truefalse') return 'Correct answer: '+(part.answer?'True':'False');
+  if(part.type==='order') return 'Check the order and try again next time.';
+  if(part.type==='match') return 'The correct pairs are highlighted above.';
+  if(part.type==='multiselect') return 'Correct answers: '+part.correctIndexes.map(i=>esc(part.options[i])).join(', ');
+  if(part.type==='shortanswer') return 'Correct answer: '+esc(part.answers[0]);
+  if(part.type==='spotbug') return 'Line '+(part.buggyIndex+1)+' has the bug.'+(part.explanation?' '+esc(part.explanation):'');
+  return '';
+}
+function checkCurrent(){
+  const p=state.player; const part=p.parts[p.partIndex]; const t=p.transient;
+  const correct=computeCorrect(part,t);
+  if(!p.redemption && correct) p.correctCount++;
+  if(!correct) p.wrongQueue.push(part);
+  p.checked=true; p.wasCorrect=correct;
+  render();
+}
+function continuePart(){
+  const p=state.player;
+  if(p.partIndex<p.parts.length-1){ enterPart(p.partIndex+1); render(); return; }
+  if(p.wrongQueue.length){
+    // Redemption round: retry everything gotten wrong this round, and keep
+    // looping through redemption rounds until nothing is left to fix.
+    p.parts=p.wrongQueue;
+    p.wrongQueue=[];
+    p.redemption=true;
+    p.round=(p.round||1)+1;
+    enterPart(0);
+    render();
+  } else {
+    finishLesson();
+  }
+}
+function finishLesson(){
+  const p=state.player;
+  const acc = p.checkableCount? p.correctCount/p.checkableCount : 1;
+  const xp = 10 + (acc>=1?5:0);
+  p.finished=true; p.xpGained=xp;
+  if(!state.progress.completed[p.langId]) state.progress.completed[p.langId]={};
+  state.progress.completed[p.langId][p.lessonId]=true;
+  state.progress.xp += xp;
+  saveProgress();
+  render();
+}
+
+/* ---------- confirm bar (generic) ---------- */
+function renderConfirmBar(){
+  let bar=document.getElementById('confirmBar');
+  if(!bar){bar=document.createElement('div'); bar.id='confirmBar'; bar.className='confirm-bar'; document.body.appendChild(bar);}
+  bar.innerHTML=`<span style="font-size:14px;">${esc(state.pendingDelete.label)}</span>
+    <button class="btn btn-sm" onclick="cancelPending()">Cancel</button>
+    <button class="btn btn-danger btn-sm" onclick="confirmPending()">Confirm</button>`;
+}
+function cancelPending(){state.pendingDelete=null; removeConfirmBar(); }
+function removeConfirmBar(){const b=document.getElementById('confirmBar'); if(b) b.remove();}
+function confirmPending(){
+  const pd=state.pendingDelete; state.pendingDelete=null; removeConfirmBar();
+  if(!pd) return;
+  if(pd.kind==='exitPlayer'){ state.player=null; render(); return; }
+  if(pd.kind==='deleteLanguage'){
+    state.data.languages=state.data.languages.filter(l=>l.id!==pd.id);
+    if(state.currentLanguageId===pd.id) state.currentLanguageId=null;
+    if(state.builderPath.languageId===pd.id) state.builderPath={languageId:null,sectionId:null,lessonId:null};
+    saveData(); toast('Language deleted'); render();
+  }
+  if(pd.kind==='deleteSection'){
+    const lang=getLang(pd.langId); lang.sections=lang.sections.filter(s=>s.id!==pd.id);
+    if(state.builderPath.sectionId===pd.id) state.builderPath.sectionId=null;
+    saveData(); toast('Section deleted'); render();
+  }
+  if(pd.kind==='deleteLesson'){
+    const lang=getLang(pd.langId); const sec=getSection(lang,pd.secId);
+    sec.lessons=sec.lessons.filter(l=>l.id!==pd.id);
+    if(state.builderPath.lessonId===pd.id) state.builderPath.lessonId=null;
+    saveData(); toast('Lesson deleted'); render();
+  }
+  if(pd.kind==='deletePart'){
+    const lang=getLang(pd.langId); const sec=getSection(lang,pd.secId); const les=getLesson(sec,pd.lesId);
+    les.parts=les.parts.filter(p=>p.id!==pd.id);
+    saveData(); toast('Part deleted'); render();
+  }
+}
+
+/* ---------- CREATE MODE ---------- */
+function renderCreate(){
+  let html=`<div class="create-tabs">
+    <button class="${state.createTab==='builder'?'active':''}" onclick="setCreateTab('builder')">Builder</button>
+    <button class="${state.createTab==='code'?'active':''}" onclick="setCreateTab('code')">Code</button>
+  </div>`;
+  html+= state.createTab==='builder' ? renderBuilder() : renderCodeEditor();
+  return html;
+}
+function setCreateTab(t){
+  state.createTab=t; state.editing=null;
+  if(t==='code') state.codeDraft=JSON.stringify(state.data,null,2);
+  render();
+}
+
+function renderBuilder(){
+  const bp=state.builderPath;
+  if(bp.languageId && bp.lessonId) return renderLessonBuilder();
+  if(bp.languageId && bp.sectionId) return renderSectionBuilder();
+  if(bp.languageId) return renderLanguageBuilder();
+  return renderLanguageListBuilder();
+}
+
+function crumbs(items){
+  let html='<div class="breadcrumb">';
+  items.forEach((it,i)=>{
+    if(i>0) html+='<span class="sep">/</span>';
+    if(it.onclick) html+=`<button onclick="${it.onclick}">${esc(it.label)}</button>`;
+    else html+=`<span class="cur">${esc(it.label)}</span>`;
+  });
+  return html+'</div>';
+}
+
+function renderLanguageListBuilder(){
+  const langs=state.data.languages;
+  let rows = langs.map(l=>{
+    const total=flatLessons(l).length;
+    return `<div class="entity-row">
+      <div class="lang-glyph" style="background:${colorOf(l.color).bg};color:${colorOf(l.color).text};width:38px;height:38px;font-size:12px;margin:0;">${esc(l.icon||'')}</div>
+      <div class="main" onclick="goLanguage('${l.id}')" style="cursor:pointer;">
+        <div class="t">${esc(l.name)}</div>
+        <div class="s">${l.sections.length} sections &middot; ${total} lessons</div>
+      </div>
+      <div class="acts">
+        <button class="btn btn-icon btn-sm" onclick="editLanguageForm('${l.id}')" title="Edit">&#9998;</button>
+        <button class="btn btn-icon btn-sm btn-danger" onclick="askDeleteLanguage('${l.id}')" title="Delete">&#128465;</button>
+      </div>
+    </div>`;
+  }).join('');
+  let form = state.editing && state.editing.kind==='language' ? renderLanguageForm() : '';
+  return `<h3 style="font-size:16px;margin-bottom:14px;">Languages</h3>
+    ${form}
+    ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No languages yet.</p>'}
+    ${state.editing && state.editing.kind==='language' ? '' : `<button class="btn btn-primary" onclick="newLanguageForm()">+ New language</button>`}`;
+}
+function goLanguage(id){state.builderPath={languageId:id,sectionId:null,lessonId:null}; state.editing=null; render();}
+function newLanguageForm(){state.editing={kind:'language', id:null, draft:{name:'',icon:'',color:'blue'}}; render();}
+function editLanguageForm(id){const l=getLang(id); state.editing={kind:'language', id, draft:{name:l.name,icon:l.icon||'',color:l.color||'blue'}}; render();}
+function renderLanguageForm(){
+  const d=state.editing.draft;
+  const dots=Object.keys(COLORS).map(k=>`<div class="color-dot ${d.color===k?'sel':''}" style="background:${COLORS[k].main};" onclick="setDraftField('color','${k}')"></div>`).join('');
+  return `<div class="form-panel">
+    <h4>${state.editing.id?'Edit language':'New language'}</h4>
+    <div class="field-row">
+      <div class="field"><label>Name</label><input type="text" data-focus-key="lang-name" value="${esc(d.name)}" oninput="setDraftField('name',this.value)" placeholder="Python"></div>
+      <div class="field"><label>Icon (2-3 letters)</label><input type="text" data-focus-key="lang-icon" value="${esc(d.icon)}" oninput="setDraftField('icon',this.value)" placeholder="PY" maxlength="3"></div>
+    </div>
+    <div class="field"><label>Color</label><div class="color-row">${dots}</div></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveLanguageForm()">Save</button>
+      <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+    </div>
+  </div>`;
+}
+function setDraftField(k,v){state.editing.draft[k]=v; render();}
+function cancelEdit(){state.editing=null; render();}
+function saveLanguageForm(){
+  const d=state.editing.draft;
+  if(!d.name.trim()){toast('Name is required'); return;}
+  if(state.editing.id){
+    const l=getLang(state.editing.id); l.name=d.name.trim(); l.icon=d.icon.trim()||d.name.slice(0,2).toUpperCase(); l.color=d.color;
+  } else {
+    state.data.languages.push({id:uid(), name:d.name.trim(), icon:(d.icon.trim()||d.name.slice(0,2).toUpperCase()), color:d.color, sections:[]});
+  }
+  state.editing=null; saveData(); toast('Saved'); render();
+}
+function askDeleteLanguage(id){state.pendingDelete={kind:'deleteLanguage', id, label:'Delete this language and everything in it?'}; render();}
+
+function renderLanguageBuilder(){
+  const lang=getLang(state.builderPath.languageId);
+  if(!lang){state.builderPath={languageId:null,sectionId:null,lessonId:null}; return renderLanguageListBuilder();}
+  let rows=lang.sections.map((sec,i)=>`<div class="entity-row">
+    <span class="grip">${i+1}</span>
+    <div class="main" onclick="goSection('${sec.id}')" style="cursor:pointer;">
+      <div class="t">${esc(sec.title)}</div>
+      <div class="s">${sec.lessons.length} lessons</div>
+    </div>
+    <div class="acts">
+      <button class="btn btn-icon btn-sm" ${i===0?'disabled':''} onclick="moveSection('${sec.id}',-1)" title="Move up">&#8593;</button>
+      <button class="btn btn-icon btn-sm" ${i===lang.sections.length-1?'disabled':''} onclick="moveSection('${sec.id}',1)" title="Move down">&#8595;</button>
+      <button class="btn btn-icon btn-sm" onclick="editSectionForm('${sec.id}')" title="Edit">&#9998;</button>
+      <button class="btn btn-icon btn-sm btn-danger" onclick="askDeleteSection('${sec.id}')" title="Delete">&#128465;</button>
+    </div>
+  </div>`).join('');
+  let form = state.editing && state.editing.kind==='section' ? renderSectionForm() : '';
+  return `${crumbs([{label:'Languages',onclick:'goLanguage(null)'},{label:lang.name}])}
+    <h3 style="font-size:16px;margin-bottom:14px;">Sections in ${esc(lang.name)}</h3>
+    ${form}
+    ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No sections yet.</p>'}
+    ${state.editing && state.editing.kind==='section' ? '' : `<button class="btn btn-primary" onclick="newSectionForm()">+ New section</button>`}`;
+}
+function goSection(id){state.builderPath.sectionId=id; state.builderPath.lessonId=null; state.editing=null; render();}
+function newSectionForm(){state.editing={kind:'section', id:null, draft:{title:'',description:''}}; render();}
+function editSectionForm(id){const lang=getLang(state.builderPath.languageId); const s=getSection(lang,id); state.editing={kind:'section', id, draft:{title:s.title,description:s.description||''}}; render();}
+function renderSectionForm(){
+  const d=state.editing.draft;
+  return `<div class="form-panel">
+    <h4>${state.editing.id?'Edit section':'New section'}</h4>
+    <div class="field"><label>Title</label><input type="text" data-focus-key="sec-title" value="${esc(d.title)}" oninput="setDraftField('title',this.value)" placeholder="Basics"></div>
+    <div class="field"><label>Description (optional)</label><input type="text" data-focus-key="sec-desc" value="${esc(d.description)}" oninput="setDraftField('description',this.value)" placeholder="Say hello and store your first values."></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveSectionForm()">Save</button>
+      <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+    </div>
+  </div>`;
+}
+function saveSectionForm(){
+  const d=state.editing.draft; if(!d.title.trim()){toast('Title is required'); return;}
+  const lang=getLang(state.builderPath.languageId);
+  if(state.editing.id){ const s=getSection(lang,state.editing.id); s.title=d.title.trim(); s.description=d.description.trim(); }
+  else { lang.sections.push({id:uid(), title:d.title.trim(), description:d.description.trim(), lessons:[]}); }
+  state.editing=null; saveData(); toast('Saved'); render();
+}
+function askDeleteSection(id){state.pendingDelete={kind:'deleteSection', id, langId:state.builderPath.languageId, label:'Delete this section and its lessons?'}; render();}
+function moveSection(id,dir){
+  const lang=getLang(state.builderPath.languageId); const arr=lang.sections;
+  const i=arr.findIndex(s=>s.id===id); const j=i+dir; if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
+}
+
+function renderSectionBuilder(){
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId);
+  if(!sec){state.builderPath.sectionId=null; return renderLanguageBuilder();}
+  let rows=sec.lessons.map((les,i)=>`<div class="entity-row">
+    <span class="grip">${i+1}</span>
+    <div class="main" onclick="goLesson('${les.id}')" style="cursor:pointer;">
+      <div class="t">${esc(les.title)}</div>
+      <div class="s">${les.parts.length} parts</div>
+    </div>
+    <div class="acts">
+      <button class="btn btn-icon btn-sm" ${i===0?'disabled':''} onclick="moveLesson('${les.id}',-1)" title="Move up">&#8593;</button>
+      <button class="btn btn-icon btn-sm" ${i===sec.lessons.length-1?'disabled':''} onclick="moveLesson('${les.id}',1)" title="Move down">&#8595;</button>
+      <button class="btn btn-icon btn-sm" onclick="editLessonForm('${les.id}')" title="Edit">&#9998;</button>
+      <button class="btn btn-icon btn-sm btn-danger" onclick="askDeleteLesson('${les.id}')" title="Delete">&#128465;</button>
+    </div>
+  </div>`).join('');
+  let form = state.editing && state.editing.kind==='lesson' ? renderLessonForm() : '';
+  return `${crumbs([{label:'Languages',onclick:'goLanguage(null)'},{label:lang.name,onclick:'goSection(null)'},{label:sec.title}])}
+    <h3 style="font-size:16px;margin-bottom:14px;">Lessons in ${esc(sec.title)}</h3>
+    ${form}
+    ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No lessons yet.</p>'}
+    ${state.editing && state.editing.kind==='lesson' ? '' : `<button class="btn btn-primary" onclick="newLessonForm()">+ New lesson</button>`}`;
+}
+function goLesson(id){state.builderPath.lessonId=id; state.editing=null; render();}
+function newLessonForm(){state.editing={kind:'lesson', id:null, draft:{title:''}}; render();}
+function editLessonForm(id){const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,id); state.editing={kind:'lesson', id, draft:{title:les.title}}; render();}
+function renderLessonForm(){
+  const d=state.editing.draft;
+  return `<div class="form-panel">
+    <h4>${state.editing.id?'Edit lesson':'New lesson'}</h4>
+    <div class="field"><label>Title</label><input type="text" data-focus-key="les-title" value="${esc(d.title)}" oninput="setDraftField('title',this.value)" placeholder="Variables"></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveLessonForm()">Save</button>
+      <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+    </div>
+  </div>`;
+}
+function saveLessonForm(){
+  const d=state.editing.draft; if(!d.title.trim()){toast('Title is required'); return;}
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId);
+  if(state.editing.id){ const l=getLesson(sec,state.editing.id); l.title=d.title.trim(); }
+  else { sec.lessons.push({id:uid(), title:d.title.trim(), parts:[]}); }
+  state.editing=null; saveData(); toast('Saved'); render();
+}
+function askDeleteLesson(id){state.pendingDelete={kind:'deleteLesson', id, langId:state.builderPath.languageId, secId:state.builderPath.sectionId, label:'Delete this lesson and its parts?'}; render();}
+function moveLesson(id,dir){
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const arr=sec.lessons;
+  const i=arr.findIndex(l=>l.id===id); const j=i+dir; if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
+}
+
+const PART_TYPE_LABELS={info:'Info screen', mcq:'Multiple choice', multiselect:'Select all that apply', fill:'Fill in the blank', shortanswer:'Short answer', order:'Put in order', match:'Matching pairs', spotbug:'Spot the bug', truefalse:'True / False'};
+function renderLessonBuilder(){
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
+  if(!les){state.builderPath.lessonId=null; return renderSectionBuilder();}
+  let rows=les.parts.map((part,i)=>`<div class="entity-row">
+    <span class="grip">${i+1}</span>
+    <div class="main">
+      <div class="t">${PART_TYPE_LABELS[part.type]||part.type}</div>
+      <div class="s">${esc(partSummary(part))}</div>
+    </div>
+    <div class="acts">
+      <button class="btn btn-icon btn-sm" ${i===0?'disabled':''} onclick="movePart('${part.id}',-1)" title="Move up">&#8593;</button>
+      <button class="btn btn-icon btn-sm" ${i===les.parts.length-1?'disabled':''} onclick="movePart('${part.id}',1)" title="Move down">&#8595;</button>
+      <button class="btn btn-icon btn-sm" onclick="editPartForm('${part.id}')" title="Edit">&#9998;</button>
+      <button class="btn btn-icon btn-sm btn-danger" onclick="askDeletePart('${part.id}')" title="Delete">&#128465;</button>
+    </div>
+  </div>`).join('');
+  let form = state.editing && state.editing.kind==='part' ? renderPartForm() : '';
+  return `${crumbs([{label:'Languages',onclick:'goLanguage(null)'},{label:lang.name,onclick:'goSection(null)'},{label:sec.title,onclick:'goLesson(null)'},{label:les.title}])}
+    <h3 style="font-size:16px;margin-bottom:14px;">Parts in ${esc(les.title)}</h3>
+    ${form}
+    ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No parts yet. A lesson needs at least one part.</p>'}
+    ${state.editing && state.editing.kind==='part' ? '' : renderAddPartControls()}`;
+}
+function partSummary(p){
+  if(p.type==='info') return p.title;
+  if(p.type==='mcq') return p.prompt;
+  if(p.type==='fill') return p.prompt;
+  if(p.type==='order') return p.prompt;
+  if(p.type==='match') return p.prompt;
+  if(p.type==='multiselect') return p.prompt;
+  if(p.type==='shortanswer') return p.prompt;
+  if(p.type==='spotbug') return p.prompt;
+  if(p.type==='truefalse') return p.statement;
+  return '';
+}
+function renderAddPartControls(){
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;">
+    ${Object.keys(PART_TYPE_LABELS).map(t=>`<button class="btn btn-sm" onclick="newPartForm('${t}')">+ ${PART_TYPE_LABELS[t]}</button>`).join('')}
+  </div>`;
+}
+function defaultDraftForType(t){
+  if(t==='info') return {type:'info', title:'', body:'', code:''};
+  if(t==='mcq') return {type:'mcq', prompt:'', code:'', options:['',''], correctIndex:0};
+  if(t==='multiselect') return {type:'multiselect', prompt:'', code:'', options:['','',''], correctIndexes:[0]};
+  if(t==='fill') return {type:'fill', prompt:'', code:'', answer:'', hint:''};
+  if(t==='shortanswer') return {type:'shortanswer', prompt:'', answers:['']};
+  if(t==='order') return {type:'order', prompt:'', lines:['','']};
+  if(t==='match') return {type:'match', prompt:'', pairs:[{left:'',right:''},{left:'',right:''}]};
+  if(t==='spotbug') return {type:'spotbug', prompt:'', lines:['',''], buggyIndex:0, explanation:''};
+  if(t==='truefalse') return {type:'truefalse', statement:'', code:'', answer:true};
+}
+function newPartForm(t){state.editing={kind:'part', id:null, draft:defaultDraftForType(t)}; render();}
+function editPartForm(id){
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
+  const part=les.parts.find(p=>p.id===id);
+  state.editing={kind:'part', id, draft:JSON.parse(JSON.stringify(part))};
+  render();
+}
+function renderPartForm(){
+  const d=state.editing.draft;
+  let fields='';
+  if(d.type==='info'){
+    fields=`<div class="field"><label>Title</label><input type="text" data-focus-key="part-title" value="${esc(d.title)}" oninput="setDraftField('title',this.value)" placeholder="Meet print()"></div>
+    <div class="field"><label>Explanation</label><textarea data-focus-key="part-body" oninput="setDraftField('body',this.value)">${esc(d.body)}</textarea></div>
+    <div class="field"><label>Code example (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>`;
+  } else if(d.type==='mcq'){
+    fields=`<div class="field"><label>Question</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="What will this code output?"></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
+    <div class="field"><label>Options (select the correct one)</label>
+      ${d.options.map((o,i)=>`<div class="option-edit-row">
+        <input type="radio" name="correctOpt" ${d.correctIndex===i?'checked':''} onchange="setDraftField('correctIndex',${i})">
+        <input type="text" data-focus-key="part-opt-${i}" value="${esc(o)}" oninput="setOptionText(${i},this.value)" placeholder="Option ${i+1}">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeOption(${i})" ${d.options.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addOption()">+ Add option</button>
+    </div>`;
+  } else if(d.type==='multiselect'){
+    fields=`<div class="field"><label>Question</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Which of these are valid variable names?"></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
+    <div class="field"><label>Options (check every correct one)</label>
+      ${d.options.map((o,i)=>`<div class="option-edit-row">
+        <input type="checkbox" ${d.correctIndexes.includes(i)?'checked':''} onchange="toggleCorrectIndex(${i})">
+        <input type="text" data-focus-key="part-opt-${i}" value="${esc(o)}" oninput="setOptionText(${i},this.value)" placeholder="Option ${i+1}">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeMultiOption(${i})" ${d.options.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addOption()">+ Add option</button>
+    </div>`;
+  } else if(d.type==='fill'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Fill in the blank"></div>
+    <div class="field"><label>Code (use ___ for the blank)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea><div class="field-hint">Example: ___("Hello, World!")</div></div>
+    <div class="field"><label>Correct answer</label><input type="text" data-focus-key="part-answer" value="${esc(d.answer)}" oninput="setDraftField('answer',this.value)" placeholder="print"></div>
+    <div class="field"><label>Hint (optional)</label><input type="text" data-focus-key="part-hint" value="${esc(d.hint)}" oninput="setDraftField('hint',this.value)"></div>`;
+  } else if(d.type==='shortanswer'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="What keyword defines a function in Python?"></div>
+    <div class="field"><label>Accepted answers (any of these count)</label>
+      ${d.answers.map((a,i)=>`<div class="option-edit-row">
+        <span class="dim mono" style="width:16px;">${i+1}</span>
+        <input type="text" data-focus-key="part-sa-${i}" value="${esc(a)}" oninput="setAnswerText(${i},this.value)" placeholder="def">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeAnswer(${i})" ${d.answers.length<=1?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addAnswer()">+ Add alternate answer</button>
+    </div>`;
+  } else if(d.type==='order'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Put these lines in the correct order"></div>
+    <div class="field"><label>Lines, in correct order</label>
+      ${d.lines.map((l,i)=>`<div class="option-edit-row">
+        <span class="dim mono" style="width:16px;">${i+1}</span>
+        <input type="text" data-focus-key="part-line-${i}" value="${esc(l)}" oninput="setLineText(${i},this.value)" placeholder="line of code">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeLine(${i})" ${d.lines.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addLine()">+ Add line</button>
+    </div>`;
+  } else if(d.type==='match'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Match each item on the left to the right"></div>
+    <div class="field"><label>Pairs (left matches right)</label>
+      ${d.pairs.map((pr,i)=>`<div class="option-edit-row">
+        <span class="dim mono" style="width:16px;">${i+1}</span>
+        <input type="text" data-focus-key="part-pair-left-${i}" value="${esc(pr.left)}" oninput="setPairField(${i},'left',this.value)" placeholder="Left item">
+        <input type="text" data-focus-key="part-pair-right-${i}" value="${esc(pr.right)}" oninput="setPairField(${i},'right',this.value)" placeholder="Matching right item">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removePair(${i})" ${d.pairs.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addPair()">+ Add pair</button>
+    </div>`;
+  } else if(d.type==='spotbug'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="This function has a bug. Which line is it?"></div>
+    <div class="field"><label>Code lines (pick the one with the bug)</label>
+      ${d.lines.map((l,i)=>`<div class="option-edit-row">
+        <input type="radio" name="buggyLine" ${d.buggyIndex===i?'checked':''} onchange="setDraftField('buggyIndex',${i})">
+        <input type="text" data-focus-key="part-bugline-${i}" value="${esc(l)}" oninput="setBugLineText(${i},this.value)" placeholder="line of code">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeBugLine(${i})" ${d.lines.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addBugLine()">+ Add line</button>
+    </div>
+    <div class="field"><label>Explanation (optional, shown if they get it wrong)</label><input type="text" data-focus-key="part-bug-explain" value="${esc(d.explanation)}" oninput="setDraftField('explanation',this.value)"></div>`;
+  } else if(d.type==='truefalse'){
+    fields=`<div class="field"><label>Statement</label><input type="text" data-focus-key="part-statement" value="${esc(d.statement)}" oninput="setDraftField('statement',this.value)" placeholder="A for loop always runs exactly 10 times."></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
+    <div class="field"><label>Correct answer</label>
+      <div class="tf-row" style="max-width:240px;">
+        <button class="option ${d.answer===true?'selected':''}" onclick="setDraftField('answer',true)">True</button>
+        <button class="option ${d.answer===false?'selected':''}" onclick="setDraftField('answer',false)">False</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="form-panel">
+    <h4>${state.editing.id?'Edit part':'New part'} &middot; ${PART_TYPE_LABELS[d.type]}</h4>
+    ${fields}
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="savePartForm()">Save</button>
+      <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+    </div>
+  </div>`;
+}
+function setOptionText(i,v){state.editing.draft.options[i]=v; render();}
+function addOption(){state.editing.draft.options.push(''); render();}
+function removeOption(i){
+  const d=state.editing.draft; if(d.options.length<=2) return;
+  d.options.splice(i,1); if(d.correctIndex>=d.options.length) d.correctIndex=0; else if(d.correctIndex===i) d.correctIndex=0;
+  render();
+}
+function toggleCorrectIndex(i){
+  const d=state.editing.draft;
+  d.correctIndexes = d.correctIndexes.includes(i) ? d.correctIndexes.filter(x=>x!==i) : [...d.correctIndexes,i].sort();
+  render();
+}
+function removeMultiOption(i){
+  const d=state.editing.draft; if(d.options.length<=2) return;
+  d.options.splice(i,1);
+  d.correctIndexes = d.correctIndexes.filter(x=>x!==i).map(x=>x>i?x-1:x);
+  render();
+}
+function setAnswerText(i,v){state.editing.draft.answers[i]=v; render();}
+function addAnswer(){state.editing.draft.answers.push(''); render();}
+function removeAnswer(i){const d=state.editing.draft; if(d.answers.length<=1) return; d.answers.splice(i,1); render();}
+function setBugLineText(i,v){state.editing.draft.lines[i]=v; render();}
+function addBugLine(){state.editing.draft.lines.push(''); render();}
+function removeBugLine(i){
+  const d=state.editing.draft; if(d.lines.length<=2) return;
+  d.lines.splice(i,1); if(d.buggyIndex>=d.lines.length) d.buggyIndex=0; else if(d.buggyIndex===i) d.buggyIndex=0;
+  render();
+}
+function setLineText(i,v){state.editing.draft.lines[i]=v; render();}
+function addLine(){state.editing.draft.lines.push(''); render();}
+function removeLine(i){const d=state.editing.draft; if(d.lines.length<=2) return; d.lines.splice(i,1); render();}
+function setPairField(i,k,v){state.editing.draft.pairs[i][k]=v; render();}
+function addPair(){state.editing.draft.pairs.push({left:'',right:''}); render();}
+function removePair(i){const d=state.editing.draft; if(d.pairs.length<=2) return; d.pairs.splice(i,1); render();}
+
+function validatePartDraft(d){
+  if(d.type==='info') return d.title.trim() && d.body.trim();
+  if(d.type==='mcq') return d.prompt.trim() && d.options.every(o=>o.trim());
+  if(d.type==='multiselect') return d.prompt.trim() && d.options.every(o=>o.trim()) && d.correctIndexes.length>0;
+  if(d.type==='fill') return d.prompt.trim() && d.code.includes('___') && d.answer.trim();
+  if(d.type==='shortanswer') return d.prompt.trim() && d.answers.some(a=>a.trim());
+  if(d.type==='order') return d.prompt.trim() && d.lines.every(l=>l.trim());
+  if(d.type==='match') return d.prompt.trim() && d.pairs.every(pr=>pr.left.trim() && pr.right.trim());
+  if(d.type==='spotbug') return d.prompt.trim() && d.lines.length>=2 && d.lines.every(l=>l.trim());
+  if(d.type==='truefalse') return d.statement.trim();
+  return false;
+}
+function savePartForm(){
+  const d=state.editing.draft;
+  if(!validatePartDraft(d)){
+    toast(d.type==='fill' ? 'Fill parts need ___ in the code and an answer' : 'Please fill in all required fields');
+    return;
+  }
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
+  if(state.editing.id){
+    const idx=les.parts.findIndex(p=>p.id===state.editing.id);
+    les.parts[idx]={...d, id:state.editing.id};
+  } else {
+    les.parts.push({...d, id:uid()});
+  }
+  state.editing=null; saveData(); toast('Saved'); render();
+}
+function askDeletePart(id){
+  state.pendingDelete={kind:'deletePart', id, langId:state.builderPath.languageId, secId:state.builderPath.sectionId, lesId:state.builderPath.lessonId, label:'Delete this part?'};
+  render();
+}
+function movePart(id,dir){
+  const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
+  const arr=les.parts; const i=arr.findIndex(p=>p.id===id); const j=i+dir; if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
+}
+
+/* ---------- code editor ---------- */
+const SCHEMA_EXAMPLE = `{
+  "languages": [
+    {
+      "id": "lang1", "name": "JavaScript", "icon": "JS", "color": "gold",
+      "sections": [
+        {
+          "id": "sec1", "title": "Basics", "description": "Getting started",
+          "lessons": [
+            {
+              "id": "les1", "title": "console.log()",
+              "parts": [
+                {"type": "info", "title": "Meet console.log", "body": "Prints text to the console.", "code": "console.log('hi')"},
+                {"type": "mcq", "prompt": "What does this print?", "code": "console.log(2+2)", "options": ["4","2+2","NaN"], "correctIndex": 0},
+                {"type": "multiselect", "prompt": "Which of these are valid variable names?", "code": "", "options": ["myVar","2var","_x","let"], "correctIndexes": [0,2]},
+                {"type": "fill", "prompt": "Fill the blank", "code": "___.log('hi')", "answer": "console", "hint": "the global object"},
+                {"type": "shortanswer", "prompt": "What keyword declares a constant?", "answers": ["const"]},
+                {"type": "truefalse", "statement": "JS is case-sensitive.", "code": "", "answer": true},
+                {"type": "order", "prompt": "Order these lines", "lines": ["function greet() {", "  return 'hi';", "}"]},
+                {"type": "match", "prompt": "Match each term to its meaning", "pairs": [{"left": "int", "right": "whole number type"}, {"left": "str", "right": "text type"}]},
+                {"type": "spotbug", "prompt": "Which line has the bug?", "lines": ["function add(a, b) {", "  return a - b;", "}"], "buggyIndex": 1, "explanation": "Should be a + b, not a - b."}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+colors available: blue, gold, mint, coral, pink. IDs can be any unique string - they will be auto-filled if missing.`;
+
+function renderCodeEditor(){
+  if(state.codeDraft==null) state.codeDraft=JSON.stringify(state.data,null,2);
+  return `<div class="code-editor-wrap">
+    <p class="muted" style="font-size:13px;margin-bottom:12px;">Edit the whole curriculum as JSON. Click Apply to load it — invalid JSON will not overwrite your saved data.</p>
+    <textarea id="codeTA" oninput="onCodeInput(this.value)" spellcheck="false">${esc(state.codeDraft)}</textarea>
+    ${state.codeError?`<div class="code-error">${esc(state.codeError)}</div>`:''}
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="applyCode()">Apply changes</button>
+      <button class="btn btn-ghost" onclick="resetCodeDraft()">Reset to saved</button>
+      <button class="btn btn-ghost" onclick="copyCode()">Copy</button>
+    </div>
+    <details class="schema-help"><summary>Show JSON format and example</summary><pre>${esc(SCHEMA_EXAMPLE)}</pre></details>
+  </div>`;
+}
+function onCodeInput(v){state.codeDraft=v;}
+function resetCodeDraft(){state.codeDraft=JSON.stringify(state.data,null,2); state.codeError=null; render();}
+function copyCode(){
+  try{navigator.clipboard.writeText(state.codeDraft); toast('Copied');}catch(e){toast('Could not copy');}
+}
+function fillMissingIds(node){
+  if(Array.isArray(node)){ node.forEach(fillMissingIds); return; }
+  if(node && typeof node==='object'){
+    if('type' in node && !('id' in node)) node.id=uid();
+    if(('name' in node || 'title' in node) && !('id' in node)) node.id=uid();
+    Object.values(node).forEach(v=>{ if(v && typeof v==='object') fillMissingIds(v); });
+  }
+}
+function applyCode(){
+  let parsed;
+  try{ parsed=JSON.parse(state.codeDraft); }
+  catch(e){ state.codeError='Invalid JSON: '+e.message; render(); return; }
+  if(!parsed || !Array.isArray(parsed.languages)){ state.codeError='Root object needs a "languages" array.'; render(); return; }
+  fillMissingIds(parsed);
+  state.data=parsed; state.codeError=null; state.codeDraft=JSON.stringify(state.data,null,2);
+  state.currentLanguageId=null; state.builderPath={languageId:null,sectionId:null,lessonId:null};
+  saveData(); toast('Applied'); render();
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  state.data=await loadData();
+  state.progress=await loadProgress();
+  render();
+}
+boot();
+</script>
+</body>
+</html>
