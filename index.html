@@ -184,7 +184,7 @@
   .feedback-bar.bad{background:var(--coral-dark);color:var(--coral-text);}
   .feedback-sub{font-weight:400;font-size:13px;margin-top:4px;color:var(--text-muted);}
   .player-footer{margin-top:24px;}
-  .info-body{color:var(--text-muted);font-size:15px;line-height:1.7;}
+  .info-body{color:var(--text-muted);font-size:15px;line-height:1.7;white-space:pre-wrap;}
 
   .complete-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;}
   .complete-badge{width:96px;height:96px;border-radius:50%;background:var(--mint-dark);border:2px solid var(--mint);
@@ -382,6 +382,7 @@ function renderTopbar(){
     </div>
     <div class="top-actions">
       <div class="xp-pill">&#9733; ${state.progress.xp} XP</div>
+      <button class="btn btn-ghost btn-sm" title="Reset progress" onclick="askResetProgress()">Reset progress</button>
       <div class="mode-switch">
         <button class="${state.view==='learn'?'active':''}" onclick="setView('learn')">Learn</button>
         <button class="${state.view==='create'?'active':''}" onclick="setView('create')">Create</button>
@@ -502,6 +503,8 @@ function enterPart(i){
   if(part && part.type==='multiselect'){p.transient.selected=[];}
   if(part && part.type==='shortanswer'){p.transient.value='';}
   if(part && part.type==='spotbug'){p.transient.selected=null;}
+  if(part && part.type==='classify'){p.transient.selections=new Array(part.items.length).fill(null);}
+  if(part && part.type==='reflect'){p.transient.notes=''; p.transient.revealed=false;}
   if(part && part.type==='match'){
     p.transient.rightOrder=shuffle(part.pairs.map((pr,idx)=>idx));
     p.transient.matched={};
@@ -685,8 +688,43 @@ function renderPart(part){
       <p class="dim" style="font-size:12px;">Tap the line that has the bug.</p>
       <div class="order-target">${linesHtml}</div>`;
   }
+  if(part.type==='classify'){
+    const t=state.player.transient;
+    const checked=state.player.checked;
+    const itemsHtml=part.items.map((it,i)=>{
+      const sel=t.selections[i];
+      const btns=part.categories.map((cat,ci)=>{
+        let cls='option';
+        if(checked){
+          if(ci===it.categoryIndex) cls+=' correct';
+          else if(ci===sel) cls+=' wrong';
+        } else if(ci===sel) cls+=' selected';
+        return `<button class="${cls}" style="flex:1;padding:8px 10px;font-size:13px;" ${checked?'disabled':''} onclick="selectClassify(${i},${ci})">${esc(cat)}</button>`;
+      }).join('');
+      return `<div class="order-line" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <div class="mono" style="font-size:13px;">${esc(it.text)}</div>
+        <div style="display:flex;gap:8px;">${btns}</div>
+      </div>`;
+    }).join('');
+    return `<div class="part-kicker">Sort each item</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <div class="order-target" style="gap:10px;">${itemsHtml}</div>`;
+  }
+  if(part.type==='reflect'){
+    const t=state.player.transient;
+    return `<div class="part-kicker">Reflect</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <textarea class="text-input" style="min-height:100px;" placeholder="Jot down your answer here (not graded, just for you)" oninput="onReflectNotes(this.value)">${esc(t.notes||'')}</textarea>
+      ${t.revealed?`<div class="code-block" style="color:var(--text);white-space:pre-wrap;"><strong>Model answer</strong><br>${esc(part.modelAnswer)}</div>`:''}`;
+  }
   return '';
 }
+function selectClassify(i,ci){
+  if(state.player.checked) return;
+  state.player.transient.selections[i]=ci;
+  render();
+}
+function onReflectNotes(v){ state.player.transient.notes=v; }
 function toggleMultiselect(i){
   if(state.player.checked) return;
   const t=state.player.transient;
@@ -742,6 +780,7 @@ function canCheck(part){
   if(part.type==='multiselect') return (t.selected||[]).length>0;
   if(part.type==='shortanswer') return (t.value||'').trim().length>0;
   if(part.type==='spotbug') return t.selected!=null;
+  if(part.type==='classify') return (t.selections||[]).every(s=>s!=null);
   return true;
 }
 function computeCorrect(part,t){
@@ -760,6 +799,7 @@ function computeCorrect(part,t){
     return (part.answers||[]).some(a=>a.trim().toLowerCase()===given);
   }
   if(part.type==='spotbug') return t.selected===part.buggyIndex;
+  if(part.type==='classify') return part.items.every((it,i)=>t.selections[i]===it.categoryIndex);
   return true;
 }
 function renderPlayerFooter(part){
@@ -767,6 +807,16 @@ function renderPlayerFooter(part){
   if(!p.checked){
     if(part.type==='info'){
       return `<button class="btn btn-primary btn-block" onclick="continuePart()">Continue</button>`;
+    }
+    if(part.type==='reflect'){
+      if(!p.transient.revealed){
+        return `<button class="btn btn-primary btn-block" onclick="revealReflect()">Reveal model answer</button>`;
+      }
+      return `<div class="feedback-sub" style="margin-bottom:10px;">How did you do?</div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-block" style="border:2px solid var(--coral);color:var(--coral-text);" onclick="checkCurrent(false)">Need review</button>
+          <button class="btn btn-primary btn-block" onclick="checkCurrent(true)">Got it right</button>
+        </div>`;
     }
     const ok=canCheck(part);
     return `<button id="checkBtn" class="btn btn-primary btn-block" ${ok?'':'disabled'} onclick="checkCurrent()">Check</button>`;
@@ -777,20 +827,23 @@ function renderPlayerFooter(part){
   const isLast = p.partIndex===p.parts.length-1;
   return `${fb}<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="continuePart()">${isLast?'Finish':'Continue'}</button>`;
 }
+function revealReflect(){ state.player.transient.revealed=true; render(); }
 function answerHint(part){
   if(part.type==='mcq') return 'Correct answer: '+esc(part.options[part.correctIndex]);
   if(part.type==='fill') return 'Correct answer: '+esc(part.answer);
   if(part.type==='truefalse') return 'Correct answer: '+(part.answer?'True':'False');
   if(part.type==='order') return 'Check the order and try again next time.';
   if(part.type==='match') return 'The correct pairs are highlighted above.';
+  if(part.type==='classify') return 'The correct groupings are highlighted above.';
+  if(part.type==='reflect') return 'Take another look at the model answer above.';
   if(part.type==='multiselect') return 'Correct answers: '+part.correctIndexes.map(i=>esc(part.options[i])).join(', ');
   if(part.type==='shortanswer') return 'Correct answer: '+esc(part.answers[0]);
   if(part.type==='spotbug') return 'Line '+(part.buggyIndex+1)+' has the bug.'+(part.explanation?' '+esc(part.explanation):'');
   return '';
 }
-function checkCurrent(){
+function checkCurrent(forceCorrect){
   const p=state.player; const part=p.parts[p.partIndex]; const t=p.transient;
-  const correct=computeCorrect(part,t);
+  const correct = forceCorrect!=null ? forceCorrect : computeCorrect(part,t);
   if(!p.redemption && correct) p.correctCount++;
   if(!correct) p.wrongQueue.push(part);
   p.checked=true; p.wasCorrect=correct;
@@ -860,6 +913,14 @@ function confirmPending(){
     les.parts=les.parts.filter(p=>p.id!==pd.id);
     saveData(); toast('Part deleted'); render();
   }
+  if(pd.kind==='resetProgress'){
+    state.progress={xp:0, completed:{}};
+    saveProgress(); toast('Progress reset'); render();
+  }
+}
+function askResetProgress(){
+  state.pendingDelete={kind:'resetProgress', label:'Reset all XP and lesson progress? Your languages and lessons will stay.'};
+  render();
 }
 
 /* ---------- CREATE MODE ---------- */
@@ -1053,7 +1114,7 @@ function moveLesson(id,dir){
   [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
 }
 
-const PART_TYPE_LABELS={info:'Info screen', mcq:'Multiple choice', multiselect:'Select all that apply', fill:'Fill in the blank', shortanswer:'Short answer', order:'Put in order', match:'Matching pairs', spotbug:'Spot the bug', truefalse:'True / False'};
+const PART_TYPE_LABELS={info:'Info screen', mcq:'Multiple choice', multiselect:'Select all that apply', fill:'Fill in the blank', shortanswer:'Short answer', order:'Put in order', match:'Matching pairs', classify:'Sort into categories', spotbug:'Spot the bug', reflect:'Reflect (self-graded)', truefalse:'True / False'};
 function renderLessonBuilder(){
   const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
   if(!les){state.builderPath.lessonId=null; return renderSectionBuilder();}
@@ -1086,6 +1147,8 @@ function partSummary(p){
   if(p.type==='multiselect') return p.prompt;
   if(p.type==='shortanswer') return p.prompt;
   if(p.type==='spotbug') return p.prompt;
+  if(p.type==='classify') return p.prompt;
+  if(p.type==='reflect') return p.prompt;
   if(p.type==='truefalse') return p.statement;
   return '';
 }
@@ -1103,6 +1166,8 @@ function defaultDraftForType(t){
   if(t==='order') return {type:'order', prompt:'', lines:['','']};
   if(t==='match') return {type:'match', prompt:'', pairs:[{left:'',right:''},{left:'',right:''}]};
   if(t==='spotbug') return {type:'spotbug', prompt:'', lines:['',''], buggyIndex:0, explanation:''};
+  if(t==='classify') return {type:'classify', prompt:'', categories:['',''], items:[{text:'',categoryIndex:0},{text:'',categoryIndex:1}]};
+  if(t==='reflect') return {type:'reflect', prompt:'', modelAnswer:''};
   if(t==='truefalse') return {type:'truefalse', statement:'', code:'', answer:true};
 }
 function newPartForm(t){state.editing={kind:'part', id:null, draft:defaultDraftForType(t)}; render();}
@@ -1125,7 +1190,7 @@ function renderPartForm(){
     <div class="field"><label>Options (select the correct one)</label>
       ${d.options.map((o,i)=>`<div class="option-edit-row">
         <input type="radio" name="correctOpt" ${d.correctIndex===i?'checked':''} onchange="setDraftField('correctIndex',${i})">
-        <input type="text" data-focus-key="part-opt-${i}" value="${esc(o)}" oninput="setOptionText(${i},this.value)" placeholder="Option ${i+1}">
+        <input type="text" data-focus-key="part-opt-${i}" value="${esc(o)}" oninput="setOptionText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addOptionViaEnter();}" placeholder="Option ${i+1}">
         <button class="btn btn-icon btn-sm btn-danger" onclick="removeOption(${i})" ${d.options.length<=2?'disabled':''}>&#10005;</button>
       </div>`).join('')}
       <button class="btn btn-sm" onclick="addOption()">+ Add option</button>
@@ -1136,7 +1201,7 @@ function renderPartForm(){
     <div class="field"><label>Options (check every correct one)</label>
       ${d.options.map((o,i)=>`<div class="option-edit-row">
         <input type="checkbox" ${d.correctIndexes.includes(i)?'checked':''} onchange="toggleCorrectIndex(${i})">
-        <input type="text" data-focus-key="part-opt-${i}" value="${esc(o)}" oninput="setOptionText(${i},this.value)" placeholder="Option ${i+1}">
+        <input type="text" data-focus-key="part-opt-${i}" value="${esc(o)}" oninput="setOptionText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addOptionViaEnter();}" placeholder="Option ${i+1}">
         <button class="btn btn-icon btn-sm btn-danger" onclick="removeMultiOption(${i})" ${d.options.length<=2?'disabled':''}>&#10005;</button>
       </div>`).join('')}
       <button class="btn btn-sm" onclick="addOption()">+ Add option</button>
@@ -1151,7 +1216,7 @@ function renderPartForm(){
     <div class="field"><label>Accepted answers (any of these count)</label>
       ${d.answers.map((a,i)=>`<div class="option-edit-row">
         <span class="dim mono" style="width:16px;">${i+1}</span>
-        <input type="text" data-focus-key="part-sa-${i}" value="${esc(a)}" oninput="setAnswerText(${i},this.value)" placeholder="def">
+        <input type="text" data-focus-key="part-sa-${i}" value="${esc(a)}" oninput="setAnswerText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addAnswerViaEnter();}" placeholder="def">
         <button class="btn btn-icon btn-sm btn-danger" onclick="removeAnswer(${i})" ${d.answers.length<=1?'disabled':''}>&#10005;</button>
       </div>`).join('')}
       <button class="btn btn-sm" onclick="addAnswer()">+ Add alternate answer</button>
@@ -1161,7 +1226,7 @@ function renderPartForm(){
     <div class="field"><label>Lines, in correct order</label>
       ${d.lines.map((l,i)=>`<div class="option-edit-row">
         <span class="dim mono" style="width:16px;">${i+1}</span>
-        <input type="text" data-focus-key="part-line-${i}" value="${esc(l)}" oninput="setLineText(${i},this.value)" placeholder="line of code">
+        <input type="text" data-focus-key="part-line-${i}" value="${esc(l)}" oninput="setLineText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addLineViaEnter();}" placeholder="line of code">
         <button class="btn btn-icon btn-sm btn-danger" onclick="removeLine(${i})" ${d.lines.length<=2?'disabled':''}>&#10005;</button>
       </div>`).join('')}
       <button class="btn btn-sm" onclick="addLine()">+ Add line</button>
@@ -1171,8 +1236,8 @@ function renderPartForm(){
     <div class="field"><label>Pairs (left matches right)</label>
       ${d.pairs.map((pr,i)=>`<div class="option-edit-row">
         <span class="dim mono" style="width:16px;">${i+1}</span>
-        <input type="text" data-focus-key="part-pair-left-${i}" value="${esc(pr.left)}" oninput="setPairField(${i},'left',this.value)" placeholder="Left item">
-        <input type="text" data-focus-key="part-pair-right-${i}" value="${esc(pr.right)}" oninput="setPairField(${i},'right',this.value)" placeholder="Matching right item">
+        <input type="text" data-focus-key="part-pair-left-${i}" value="${esc(pr.left)}" oninput="setPairField(${i},'left',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addPairViaEnter();}" placeholder="Left item">
+        <input type="text" data-focus-key="part-pair-right-${i}" value="${esc(pr.right)}" oninput="setPairField(${i},'right',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addPairViaEnter();}" placeholder="Matching right item">
         <button class="btn btn-icon btn-sm btn-danger" onclick="removePair(${i})" ${d.pairs.length<=2?'disabled':''}>&#10005;</button>
       </div>`).join('')}
       <button class="btn btn-sm" onclick="addPair()">+ Add pair</button>
@@ -1182,12 +1247,30 @@ function renderPartForm(){
     <div class="field"><label>Code lines (pick the one with the bug)</label>
       ${d.lines.map((l,i)=>`<div class="option-edit-row">
         <input type="radio" name="buggyLine" ${d.buggyIndex===i?'checked':''} onchange="setDraftField('buggyIndex',${i})">
-        <input type="text" data-focus-key="part-bugline-${i}" value="${esc(l)}" oninput="setBugLineText(${i},this.value)" placeholder="line of code">
+        <input type="text" data-focus-key="part-bugline-${i}" value="${esc(l)}" oninput="setBugLineText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addBugLineViaEnter();}" placeholder="line of code">
         <button class="btn btn-icon btn-sm btn-danger" onclick="removeBugLine(${i})" ${d.lines.length<=2?'disabled':''}>&#10005;</button>
       </div>`).join('')}
       <button class="btn btn-sm" onclick="addBugLine()">+ Add line</button>
     </div>
     <div class="field"><label>Explanation (optional, shown if they get it wrong)</label><input type="text" data-focus-key="part-bug-explain" value="${esc(d.explanation)}" oninput="setDraftField('explanation',this.value)"></div>`;
+  } else if(d.type==='classify'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Sort each snippet into the right category"></div>
+    <div class="field"><label>Category A</label><input type="text" data-focus-key="part-cat-0" value="${esc(d.categories[0])}" oninput="setCategoryText(0,this.value)" placeholder="Valid syntax"></div>
+    <div class="field"><label>Category B</label><input type="text" data-focus-key="part-cat-1" value="${esc(d.categories[1])}" oninput="setCategoryText(1,this.value)" placeholder="Syntax error"></div>
+    <div class="field"><label>Items</label>
+      ${d.items.map((it,i)=>`<div class="option-edit-row">
+        <input type="text" data-focus-key="part-item-${i}" value="${esc(it.text)}" oninput="setItemText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addItemViaEnter();}" placeholder="item">
+        <select onchange="setItemCategory(${i},this.value)" style="max-width:140px;">
+          <option value="0" ${it.categoryIndex===0?'selected':''}>${esc(d.categories[0]||'Category A')}</option>
+          <option value="1" ${it.categoryIndex===1?'selected':''}>${esc(d.categories[1]||'Category B')}</option>
+        </select>
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeItem(${i})" ${d.items.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addItem()">+ Add item</button>
+    </div>`;
+  } else if(d.type==='reflect'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Explain in your own words: what is a closure?"></div>
+    <div class="field"><label>Model answer</label><textarea data-focus-key="part-model-answer" oninput="setDraftField('modelAnswer',this.value)">${esc(d.modelAnswer)}</textarea></div>`;
   } else if(d.type==='truefalse'){
     fields=`<div class="field"><label>Statement</label><input type="text" data-focus-key="part-statement" value="${esc(d.statement)}" oninput="setDraftField('statement',this.value)" placeholder="A for loop always runs exactly 10 times."></div>
     <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
@@ -1209,6 +1292,10 @@ function renderPartForm(){
 }
 function setOptionText(i,v){state.editing.draft.options[i]=v; render();}
 function addOption(){state.editing.draft.options.push(''); render();}
+function addOptionViaEnter(){
+  const d=state.editing.draft; d.options.push(''); render();
+  const el=document.querySelector(`[data-focus-key="part-opt-${d.options.length-1}"]`); if(el) el.focus();
+}
 function removeOption(i){
   const d=state.editing.draft; if(d.options.length<=2) return;
   d.options.splice(i,1); if(d.correctIndex>=d.options.length) d.correctIndex=0; else if(d.correctIndex===i) d.correctIndex=0;
@@ -1227,19 +1314,44 @@ function removeMultiOption(i){
 }
 function setAnswerText(i,v){state.editing.draft.answers[i]=v; render();}
 function addAnswer(){state.editing.draft.answers.push(''); render();}
+function addAnswerViaEnter(){
+  const d=state.editing.draft; d.answers.push(''); render();
+  const el=document.querySelector(`[data-focus-key="part-sa-${d.answers.length-1}"]`); if(el) el.focus();
+}
 function removeAnswer(i){const d=state.editing.draft; if(d.answers.length<=1) return; d.answers.splice(i,1); render();}
 function setBugLineText(i,v){state.editing.draft.lines[i]=v; render();}
 function addBugLine(){state.editing.draft.lines.push(''); render();}
+function addBugLineViaEnter(){
+  const d=state.editing.draft; d.lines.push(''); render();
+  const el=document.querySelector(`[data-focus-key="part-bugline-${d.lines.length-1}"]`); if(el) el.focus();
+}
 function removeBugLine(i){
   const d=state.editing.draft; if(d.lines.length<=2) return;
   d.lines.splice(i,1); if(d.buggyIndex>=d.lines.length) d.buggyIndex=0; else if(d.buggyIndex===i) d.buggyIndex=0;
   render();
 }
+function setCategoryText(i,v){state.editing.draft.categories[i]=v; render();}
+function setItemText(i,v){state.editing.draft.items[i].text=v; render();}
+function setItemCategory(i,v){state.editing.draft.items[i].categoryIndex=Number(v); render();}
+function addItem(){state.editing.draft.items.push({text:'',categoryIndex:0}); render();}
+function addItemViaEnter(){
+  const d=state.editing.draft; d.items.push({text:'',categoryIndex:0}); render();
+  const el=document.querySelector(`[data-focus-key="part-item-${d.items.length-1}"]`); if(el) el.focus();
+}
+function removeItem(i){const d=state.editing.draft; if(d.items.length<=2) return; d.items.splice(i,1); render();}
 function setLineText(i,v){state.editing.draft.lines[i]=v; render();}
 function addLine(){state.editing.draft.lines.push(''); render();}
+function addLineViaEnter(){
+  const d=state.editing.draft; d.lines.push(''); render();
+  const el=document.querySelector(`[data-focus-key="part-line-${d.lines.length-1}"]`); if(el) el.focus();
+}
 function removeLine(i){const d=state.editing.draft; if(d.lines.length<=2) return; d.lines.splice(i,1); render();}
 function setPairField(i,k,v){state.editing.draft.pairs[i][k]=v; render();}
 function addPair(){state.editing.draft.pairs.push({left:'',right:''}); render();}
+function addPairViaEnter(){
+  const d=state.editing.draft; d.pairs.push({left:'',right:''}); render();
+  const el=document.querySelector(`[data-focus-key="part-pair-left-${d.pairs.length-1}"]`); if(el) el.focus();
+}
 function removePair(i){const d=state.editing.draft; if(d.pairs.length<=2) return; d.pairs.splice(i,1); render();}
 
 function validatePartDraft(d){
@@ -1251,6 +1363,8 @@ function validatePartDraft(d){
   if(d.type==='order') return d.prompt.trim() && d.lines.every(l=>l.trim());
   if(d.type==='match') return d.prompt.trim() && d.pairs.every(pr=>pr.left.trim() && pr.right.trim());
   if(d.type==='spotbug') return d.prompt.trim() && d.lines.length>=2 && d.lines.every(l=>l.trim());
+  if(d.type==='classify') return d.prompt.trim() && d.categories.every(c=>c.trim()) && d.items.length>=2 && d.items.every(it=>it.text.trim());
+  if(d.type==='reflect') return d.prompt.trim() && d.modelAnswer.trim();
   if(d.type==='truefalse') return d.statement.trim();
   return false;
 }
@@ -1299,7 +1413,9 @@ const SCHEMA_EXAMPLE = `{
                 {"type": "truefalse", "statement": "JS is case-sensitive.", "code": "", "answer": true},
                 {"type": "order", "prompt": "Order these lines", "lines": ["function greet() {", "  return 'hi';", "}"]},
                 {"type": "match", "prompt": "Match each term to its meaning", "pairs": [{"left": "int", "right": "whole number type"}, {"left": "str", "right": "text type"}]},
-                {"type": "spotbug", "prompt": "Which line has the bug?", "lines": ["function add(a, b) {", "  return a - b;", "}"], "buggyIndex": 1, "explanation": "Should be a + b, not a - b."}
+                {"type": "spotbug", "prompt": "Which line has the bug?", "lines": ["function add(a, b) {", "  return a - b;", "}"], "buggyIndex": 1, "explanation": "Should be a + b, not a - b."},
+                {"type": "classify", "prompt": "Sort each snippet", "categories": ["Valid", "Syntax error"], "items": [{"text": "let x = 5;", "categoryIndex": 0}, {"text": "let = 5;", "categoryIndex": 1}]},
+                {"type": "reflect", "prompt": "Explain what a closure is in your own words", "modelAnswer": "A function that remembers variables from where it was created, even after that outer function has finished running."}
               ]
             }
           ]
