@@ -297,18 +297,18 @@ function seedData(){
 /* ---------- storage ---------- */
 const DKEY='cp_curriculum_v1', PKEY='cp_progress_v1';
 async function loadData(){
-  try{const r=await window.storage.get(DKEY,false); return r? JSON.parse(r.value): seedData();}
+  try{const raw=localStorage.getItem(DKEY); return raw? JSON.parse(raw): seedData();}
   catch(e){return seedData();}
 }
 async function loadProgress(){
-  try{const r=await window.storage.get(PKEY,false); return r? JSON.parse(r.value): {xp:0,completed:{}};}
+  try{const raw=localStorage.getItem(PKEY); return raw? JSON.parse(raw): {xp:0,completed:{}};}
   catch(e){return {xp:0,completed:{}};}
 }
 async function saveData(){
-  try{await window.storage.set(DKEY, JSON.stringify(state.data), false);}catch(e){toast('Could not save changes');}
+  try{localStorage.setItem(DKEY, JSON.stringify(state.data));}catch(e){toast('Could not save changes');}
 }
 async function saveProgress(){
-  try{await window.storage.set(PKEY, JSON.stringify(state.progress), false);}catch(e){}
+  try{localStorage.setItem(PKEY, JSON.stringify(state.progress));}catch(e){}
 }
 
 /* ---------- state ---------- */
