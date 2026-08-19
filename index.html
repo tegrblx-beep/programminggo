@@ -250,7 +250,7 @@
   /* match connector lines */
   .match-wrap{position:relative;}
   .match-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;}
-  .match-cols{position:relative;z-index:2;display:flex;gap:14px;}
+  .match-cols{position:relative;z-index:2;display:flex;gap:64px;}
   .match-col{flex:1;display:flex;flex-direction:column;gap:10px;}
   .match-item{position:relative;}
 
@@ -261,6 +261,7 @@
     .lang-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
     .field-row{flex-direction:column;gap:0;}
     .complete-stats{flex-wrap:wrap;justify-content:center;}
+    .match-cols{gap:34px;}
   }
 </style>
 </head>
@@ -310,6 +311,13 @@ const Sound=(function(){
     node(){ play(()=>{ tone(660,0.06,'triangle',0,0.09); }); },
     complete(){ play(()=>{ [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.2,'sine',i*0.1,0.17)); }); },
     xp(){ play(()=>{ tone(880,0.09,'triangle',0,0.11); }); },
+    open(){ play(()=>{ tone(500,0.05,'triangle',0,0.08); tone(760,0.07,'triangle',0.04,0.09); }); },
+    close(){ play(()=>{ tone(560,0.06,'triangle',0,0.08); tone(360,0.08,'triangle',0.04,0.08); }); },
+    save(){ play(()=>{ tone(660,0.07,'sine',0,0.15); tone(880,0.12,'sine',0.06,0.15); }); },
+    delete(){ play(()=>{ tone(300,0.07,'sawtooth',0,0.10); tone(180,0.14,'sawtooth',0.05,0.10); }); },
+    error(){ play(()=>{ tone(200,0.09,'square',0,0.08); tone(150,0.13,'square',0.07,0.08); }); },
+    nav(){ play(()=>{ tone(600,0.05,'sine',0,0.07); }); },
+    streak(){ play(()=>{ [660,880,1108.7].forEach((f,i)=>tone(f,0.13,'triangle',i*0.06,0.13)); }); },
     toggleMute(){
       muted=!muted;
       try{ localStorage.setItem('cp_muted', muted?'1':'0'); }catch(e){}
@@ -447,7 +455,7 @@ function renderTopbar(){
     </div>
   </div>`;
 }
-function setView(v){state.view=v; if(v==='learn'){} render();}
+function setView(v){Sound.nav(); state.view=v; if(v==='learn'){} render();}
 function toggleMute(){ Sound.toggleMute(); render(); }
 
 /* ---------- learn: language picker ---------- */
@@ -474,7 +482,7 @@ function renderLanguagePicker(){
   <p class="muted" style="font-size:14px;">Your progress is saved as you go.</p>
   <div class="lang-grid">${cards}</div>`;
 }
-function openLanguage(id){state.currentLanguageId=id; render();}
+function openLanguage(id){Sound.nav(); state.currentLanguageId=id; render();}
 
 /* ---------- learn: path ---------- */
 function renderPath(){
@@ -537,7 +545,7 @@ function renderPath(){
   </div>
   ${sectionsHtml}`;
 }
-function backToLanguages(){state.currentLanguageId=null; render();}
+function backToLanguages(){Sound.nav(); state.currentLanguageId=null; render();}
 
 /* ---------- lesson player ---------- */
 function startLesson(langId,sectionId,lessonId){
@@ -570,7 +578,7 @@ function enterPart(i){
     p.transient.selectedLeft=null;
   }
 }
-function exitPlayer(){state.player=null; render();}
+function exitPlayer(){Sound.nav(); state.player=null; render();}
 
 function renderPlayer(){
   let overlay=document.getElementById('playerOverlay');
@@ -609,6 +617,7 @@ function renderPlayer(){
   if(part2 && part2.type==='match') requestAnimationFrame(drawMatchLines);
 }
 function requestExitPlayer(){
+  Sound.close();
   state.pendingDelete={kind:'exitPlayer',label:'Leave this lesson? Your progress on it will not be saved.'};
   render();
 }
@@ -938,7 +947,7 @@ function renderPlayerFooter(part){
   const isLast = p.partIndex===p.parts.length-1;
   return `${fb}<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="continuePart()">${isLast?'Finish':'Continue'}</button>`;
 }
-function revealReflect(){ state.player.transient.revealed=true; render(); }
+function revealReflect(){ Sound.open(); state.player.transient.revealed=true; render(); }
 function answerHint(part){
   if(part.type==='mcq') return 'Correct answer: '+esc(part.options[part.correctIndex]);
   if(part.type==='fill') return 'Correct answer: '+esc(part.answer);
@@ -987,6 +996,7 @@ function finishLesson(){
   state.progress.xp += xp;
   saveProgress();
   Sound.complete();
+  if(acc>=1) setTimeout(()=>Sound.streak(),260);
   render();
 }
 
@@ -998,40 +1008,46 @@ function renderConfirmBar(){
     <button class="btn btn-sm" onclick="cancelPending()">Cancel</button>
     <button class="btn btn-danger btn-sm" onclick="confirmPending()">Confirm</button>`;
 }
-function cancelPending(){state.pendingDelete=null; removeConfirmBar(); }
+function cancelPending(){Sound.close(); state.pendingDelete=null; removeConfirmBar(); }
 function removeConfirmBar(){const b=document.getElementById('confirmBar'); if(b) b.remove();}
 function confirmPending(){
   const pd=state.pendingDelete; state.pendingDelete=null; removeConfirmBar();
   if(!pd) return;
-  if(pd.kind==='exitPlayer'){ state.player=null; render(); return; }
+  if(pd.kind==='exitPlayer'){ Sound.close(); state.player=null; render(); return; }
   if(pd.kind==='deleteLanguage'){
+    Sound.delete();
     state.data.languages=state.data.languages.filter(l=>l.id!==pd.id);
     if(state.currentLanguageId===pd.id) state.currentLanguageId=null;
     if(state.builderPath.languageId===pd.id) state.builderPath={languageId:null,sectionId:null,lessonId:null};
     saveData(); toast('Language deleted'); render();
   }
   if(pd.kind==='deleteSection'){
+    Sound.delete();
     const lang=getLang(pd.langId); lang.sections=lang.sections.filter(s=>s.id!==pd.id);
     if(state.builderPath.sectionId===pd.id) state.builderPath.sectionId=null;
     saveData(); toast('Section deleted'); render();
   }
   if(pd.kind==='deleteLesson'){
+    Sound.delete();
     const lang=getLang(pd.langId); const sec=getSection(lang,pd.secId);
     sec.lessons=sec.lessons.filter(l=>l.id!==pd.id);
     if(state.builderPath.lessonId===pd.id) state.builderPath.lessonId=null;
     saveData(); toast('Lesson deleted'); render();
   }
   if(pd.kind==='deletePart'){
+    Sound.delete();
     const lang=getLang(pd.langId); const sec=getSection(lang,pd.secId); const les=getLesson(sec,pd.lesId);
     les.parts=les.parts.filter(p=>p.id!==pd.id);
     saveData(); toast('Part deleted'); render();
   }
   if(pd.kind==='resetProgress'){
+    Sound.delete();
     state.progress={xp:0, completed:{}};
     saveProgress(); toast('Progress reset'); render();
   }
 }
 function askResetProgress(){
+  Sound.close();
   state.pendingDelete={kind:'resetProgress', label:'Reset all XP and lesson progress? Your languages and lessons will stay.'};
   render();
 }
@@ -1046,6 +1062,7 @@ function renderCreate(){
   return html;
 }
 function setCreateTab(t){
+  Sound.nav();
   state.createTab=t; state.editing=null;
   if(t==='code') state.codeDraft=JSON.stringify(state.data,null,2);
   render();
@@ -1091,9 +1108,9 @@ function renderLanguageListBuilder(){
     ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No languages yet.</p>'}
     ${state.editing && state.editing.kind==='language' ? '' : `<button class="btn btn-primary" onclick="newLanguageForm()">+ New language</button>`}`;
 }
-function goLanguage(id){state.builderPath={languageId:id,sectionId:null,lessonId:null}; state.editing=null; render();}
-function newLanguageForm(){state.editing={kind:'language', id:null, draft:{name:'',icon:'',color:'blue'}}; render();}
-function editLanguageForm(id){const l=getLang(id); state.editing={kind:'language', id, draft:{name:l.name,icon:l.icon||'',color:l.color||'blue'}}; render();}
+function goLanguage(id){Sound.nav(); state.builderPath={languageId:id,sectionId:null,lessonId:null}; state.editing=null; render();}
+function newLanguageForm(){Sound.open(); state.editing={kind:'language', id:null, draft:{name:'',icon:'',color:'blue'}}; render();}
+function editLanguageForm(id){Sound.open(); const l=getLang(id); state.editing={kind:'language', id, draft:{name:l.name,icon:l.icon||'',color:l.color||'blue'}}; render();}
 function renderLanguageForm(){
   const d=state.editing.draft;
   const dots=Object.keys(COLORS).map(k=>`<div class="color-dot ${d.color===k?'sel':''}" style="background:${COLORS[k].main};" onclick="setDraftField('color','${k}')"></div>`).join('');
@@ -1111,18 +1128,18 @@ function renderLanguageForm(){
   </div>`;
 }
 function setDraftField(k,v){state.editing.draft[k]=v; render();}
-function cancelEdit(){state.editing=null; render();}
+function cancelEdit(){Sound.close(); state.editing=null; render();}
 function saveLanguageForm(){
   const d=state.editing.draft;
-  if(!d.name.trim()){toast('Name is required'); return;}
+  if(!d.name.trim()){Sound.error(); toast('Name is required'); return;}
   if(state.editing.id){
     const l=getLang(state.editing.id); l.name=d.name.trim(); l.icon=d.icon.trim()||d.name.slice(0,2).toUpperCase(); l.color=d.color;
   } else {
     state.data.languages.push({id:uid(), name:d.name.trim(), icon:(d.icon.trim()||d.name.slice(0,2).toUpperCase()), color:d.color, sections:[]});
   }
-  state.editing=null; saveData(); toast('Saved'); render();
+  Sound.save(); state.editing=null; saveData(); toast('Saved'); render();
 }
-function askDeleteLanguage(id){state.pendingDelete={kind:'deleteLanguage', id, label:'Delete this language and everything in it?'}; render();}
+function askDeleteLanguage(id){Sound.close(); state.pendingDelete={kind:'deleteLanguage', id, label:'Delete this language and everything in it?'}; render();}
 
 function renderLanguageBuilder(){
   const lang=getLang(state.builderPath.languageId);
@@ -1147,9 +1164,9 @@ function renderLanguageBuilder(){
     ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No sections yet.</p>'}
     ${state.editing && state.editing.kind==='section' ? '' : `<button class="btn btn-primary" onclick="newSectionForm()">+ New section</button>`}`;
 }
-function goSection(id){state.builderPath.sectionId=id; state.builderPath.lessonId=null; state.editing=null; render();}
-function newSectionForm(){state.editing={kind:'section', id:null, draft:{title:'',description:''}}; render();}
-function editSectionForm(id){const lang=getLang(state.builderPath.languageId); const s=getSection(lang,id); state.editing={kind:'section', id, draft:{title:s.title,description:s.description||''}}; render();}
+function goSection(id){Sound.nav(); state.builderPath.sectionId=id; state.builderPath.lessonId=null; state.editing=null; render();}
+function newSectionForm(){Sound.open(); state.editing={kind:'section', id:null, draft:{title:'',description:''}}; render();}
+function editSectionForm(id){Sound.open(); const lang=getLang(state.builderPath.languageId); const s=getSection(lang,id); state.editing={kind:'section', id, draft:{title:s.title,description:s.description||''}}; render();}
 function renderSectionForm(){
   const d=state.editing.draft;
   return `<div class="form-panel">
@@ -1163,17 +1180,17 @@ function renderSectionForm(){
   </div>`;
 }
 function saveSectionForm(){
-  const d=state.editing.draft; if(!d.title.trim()){toast('Title is required'); return;}
+  const d=state.editing.draft; if(!d.title.trim()){Sound.error(); toast('Title is required'); return;}
   const lang=getLang(state.builderPath.languageId);
   if(state.editing.id){ const s=getSection(lang,state.editing.id); s.title=d.title.trim(); s.description=d.description.trim(); }
   else { lang.sections.push({id:uid(), title:d.title.trim(), description:d.description.trim(), lessons:[]}); }
-  state.editing=null; saveData(); toast('Saved'); render();
+  Sound.save(); state.editing=null; saveData(); toast('Saved'); render();
 }
-function askDeleteSection(id){state.pendingDelete={kind:'deleteSection', id, langId:state.builderPath.languageId, label:'Delete this section and its lessons?'}; render();}
+function askDeleteSection(id){Sound.close(); state.pendingDelete={kind:'deleteSection', id, langId:state.builderPath.languageId, label:'Delete this section and its lessons?'}; render();}
 function moveSection(id,dir){
   const lang=getLang(state.builderPath.languageId); const arr=lang.sections;
   const i=arr.findIndex(s=>s.id===id); const j=i+dir; if(j<0||j>=arr.length) return;
-  [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
+  Sound.click(); [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
 }
 
 function renderSectionBuilder(){
@@ -1199,9 +1216,9 @@ function renderSectionBuilder(){
     ${rows || '<p class="dim" style="font-size:13px;margin-bottom:14px;">No lessons yet.</p>'}
     ${state.editing && state.editing.kind==='lesson' ? '' : `<button class="btn btn-primary" onclick="newLessonForm()">+ New lesson</button>`}`;
 }
-function goLesson(id){state.builderPath.lessonId=id; state.editing=null; render();}
-function newLessonForm(){state.editing={kind:'lesson', id:null, draft:{title:''}}; render();}
-function editLessonForm(id){const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,id); state.editing={kind:'lesson', id, draft:{title:les.title}}; render();}
+function goLesson(id){Sound.nav(); state.builderPath.lessonId=id; state.editing=null; render();}
+function newLessonForm(){Sound.open(); state.editing={kind:'lesson', id:null, draft:{title:''}}; render();}
+function editLessonForm(id){Sound.open(); const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,id); state.editing={kind:'lesson', id, draft:{title:les.title}}; render();}
 function renderLessonForm(){
   const d=state.editing.draft;
   return `<div class="form-panel">
@@ -1214,17 +1231,17 @@ function renderLessonForm(){
   </div>`;
 }
 function saveLessonForm(){
-  const d=state.editing.draft; if(!d.title.trim()){toast('Title is required'); return;}
+  const d=state.editing.draft; if(!d.title.trim()){Sound.error(); toast('Title is required'); return;}
   const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId);
   if(state.editing.id){ const l=getLesson(sec,state.editing.id); l.title=d.title.trim(); }
   else { sec.lessons.push({id:uid(), title:d.title.trim(), parts:[]}); }
-  state.editing=null; saveData(); toast('Saved'); render();
+  Sound.save(); state.editing=null; saveData(); toast('Saved'); render();
 }
-function askDeleteLesson(id){state.pendingDelete={kind:'deleteLesson', id, langId:state.builderPath.languageId, secId:state.builderPath.sectionId, label:'Delete this lesson and its parts?'}; render();}
+function askDeleteLesson(id){Sound.close(); state.pendingDelete={kind:'deleteLesson', id, langId:state.builderPath.languageId, secId:state.builderPath.sectionId, label:'Delete this lesson and its parts?'}; render();}
 function moveLesson(id,dir){
   const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const arr=sec.lessons;
   const i=arr.findIndex(l=>l.id===id); const j=i+dir; if(j<0||j>=arr.length) return;
-  [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
+  Sound.click(); [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
 }
 
 const PART_TYPE_LABELS={info:'Info screen', mcq:'Multiple choice', multiselect:'Select all that apply', fill:'Fill in the blank', shortanswer:'Short answer', order:'Put in order', match:'Matching pairs', classify:'Sort into categories', spotbug:'Spot the bug', reflect:'Reflect (self-graded)', truefalse:'True / False'};
@@ -1283,8 +1300,9 @@ function defaultDraftForType(t){
   if(t==='reflect') return {type:'reflect', prompt:'', code:'', modelAnswer:''};
   if(t==='truefalse') return {type:'truefalse', statement:'', code:'', answer:true};
 }
-function newPartForm(t){state.editing={kind:'part', id:null, draft:defaultDraftForType(t)}; render();}
+function newPartForm(t){Sound.open(); state.editing={kind:'part', id:null, draft:defaultDraftForType(t)}; render();}
 function editPartForm(id){
+  Sound.open();
   const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
   const part=les.parts.find(p=>p.id===id);
   state.editing={kind:'part', id, draft:JSON.parse(JSON.stringify(part))};
@@ -1515,6 +1533,7 @@ function validatePartDraft(d){
 function savePartForm(){
   const d=state.editing.draft;
   if(!validatePartDraft(d)){
+    Sound.error();
     toast(d.type==='fill' ? 'Fill parts need ___ in the code and an answer' : 'Please fill in all required fields');
     return;
   }
@@ -1525,16 +1544,17 @@ function savePartForm(){
   } else {
     les.parts.push({...d, id:uid()});
   }
-  state.editing=null; saveData(); toast('Saved'); render();
+  Sound.save(); state.editing=null; saveData(); toast('Saved'); render();
 }
 function askDeletePart(id){
+  Sound.close();
   state.pendingDelete={kind:'deletePart', id, langId:state.builderPath.languageId, secId:state.builderPath.sectionId, lesId:state.builderPath.lessonId, label:'Delete this part?'};
   render();
 }
 function movePart(id,dir){
   const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
   const arr=les.parts; const i=arr.findIndex(p=>p.id===id); const j=i+dir; if(j<0||j>=arr.length) return;
-  [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
+  Sound.click(); [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
 }
 
 /* ---------- code editor ---------- */
@@ -1602,12 +1622,12 @@ function fillMissingIds(node){
 function applyCode(){
   let parsed;
   try{ parsed=JSON.parse(state.codeDraft); }
-  catch(e){ state.codeError='Invalid JSON: '+e.message; render(); return; }
-  if(!parsed || !Array.isArray(parsed.languages)){ state.codeError='Root object needs a "languages" array.'; render(); return; }
+  catch(e){ Sound.error(); state.codeError='Invalid JSON: '+e.message; render(); return; }
+  if(!parsed || !Array.isArray(parsed.languages)){ Sound.error(); state.codeError='Root object needs a "languages" array.'; render(); return; }
   fillMissingIds(parsed);
   state.data=parsed; state.codeError=null; state.codeDraft=JSON.stringify(state.data,null,2);
   state.currentLanguageId=null; state.builderPath={languageId:null,sectionId:null,lessonId:null};
-  saveData(); toast('Applied'); render();
+  saveData(); Sound.save(); toast('Applied'); render();
 }
 
 /* ---------- boot ---------- */
