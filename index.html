@@ -151,7 +151,10 @@
   .part-kicker{font-family:var(--font-display);color:var(--text-dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
   .part-prompt{font-size:20px;font-weight:700;line-height:1.4;}
   .code-block{background:var(--elev);border:1px solid var(--border);border-radius:12px;padding:16px;font-family:var(--font-display);
-    font-size:14px;line-height:1.7;color:var(--gold-text);white-space:pre-wrap;overflow-x:auto;}
+    font-size:14px;line-height:1.7;color:var(--gold-text);white-space:pre;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .code-block::-webkit-scrollbar{height:6px;}
+  .code-block::-webkit-scrollbar-track{background:transparent;}
+  .code-block::-webkit-scrollbar-thumb{background:var(--elev3);border-radius:3px;}
   .code-block input.blank{font-family:var(--font-display);font-size:14px;background:var(--elev3);color:var(--text);
     border:1px solid var(--accent);border-radius:6px;padding:2px 8px;width:140px;}
   .option-list{display:flex;flex-direction:column;gap:10px;}
@@ -262,6 +265,52 @@
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ---------- sound effects ---------- */
+/* Everything is synthesized with the Web Audio API (no audio files to load),
+   so it works offline and stays tiny. Muting is remembered across visits. */
+const Sound=(function(){
+  let ctx=null;
+  let muted=false;
+  try{ muted = localStorage.getItem('cp_muted')==='1'; }catch(e){}
+  function getCtx(){
+    if(!ctx){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC) return null;
+      ctx=new AC();
+    }
+    if(ctx.state==='suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(freq,duration,type,startTime,peak){
+    const c=getCtx(); if(!c) return;
+    const osc=c.createOscillator();
+    const gain=c.createGain();
+    osc.type=type||'sine';
+    osc.frequency.setValueAtTime(freq,c.currentTime+(startTime||0));
+    gain.gain.setValueAtTime(0.0001,c.currentTime+(startTime||0));
+    gain.gain.linearRampToValueAtTime(peak||0.18,c.currentTime+(startTime||0)+0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+(startTime||0)+duration);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(c.currentTime+(startTime||0));
+    osc.stop(c.currentTime+(startTime||0)+duration+0.03);
+  }
+  function play(fn){ if(muted) return; try{ fn(); }catch(e){} }
+  return{
+    correct(){ play(()=>{ tone(523.25,0.11,'sine',0,0.20); tone(783.99,0.16,'sine',0.09,0.20); }); },
+    wrong(){ play(()=>{ tone(220,0.16,'sawtooth',0,0.13); tone(174.6,0.22,'sawtooth',0.09,0.13); }); },
+    click(){ play(()=>{ tone(700,0.045,'square',0,0.045); }); },
+    node(){ play(()=>{ tone(660,0.06,'triangle',0,0.09); }); },
+    complete(){ play(()=>{ [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.2,'sine',i*0.1,0.17)); }); },
+    xp(){ play(()=>{ tone(880,0.09,'triangle',0,0.11); }); },
+    toggleMute(){
+      muted=!muted;
+      try{ localStorage.setItem('cp_muted', muted?'1':'0'); }catch(e){}
+      return muted;
+    },
+    isMuted(){ return muted; }
+  };
+})();
 
 /* ---------- focus preservation across re-renders ---------- */
 /* Every re-render replaces innerHTML, which normally drops focus out of any
@@ -382,6 +431,7 @@ function renderTopbar(){
     </div>
     <div class="top-actions">
       <div class="xp-pill">&#9733; ${state.progress.xp} XP</div>
+      <button class="btn btn-ghost btn-icon" title="${Sound.isMuted()?'Unmute sound effects':'Mute sound effects'}" onclick="toggleMute()">${Sound.isMuted()?'&#128263;':'&#128266;'}</button>
       <button class="btn btn-ghost btn-sm" title="Reset progress" onclick="askResetProgress()">Reset progress</button>
       <div class="mode-switch">
         <button class="${state.view==='learn'?'active':''}" onclick="setView('learn')">Learn</button>
@@ -391,6 +441,7 @@ function renderTopbar(){
   </div>`;
 }
 function setView(v){state.view=v; if(v==='learn'){} render();}
+function toggleMute(){ Sound.toggleMute(); render(); }
 
 /* ---------- learn: language picker ---------- */
 function renderLanguagePicker(){
@@ -483,6 +534,7 @@ function backToLanguages(){state.currentLanguageId=null; render();}
 
 /* ---------- lesson player ---------- */
 function startLesson(langId,sectionId,lessonId){
+  Sound.node();
   const lang=getLang(langId), sec=getSection(lang,sectionId), les=getLesson(sec,lessonId);
   state.player={langId,sectionId,lessonId,parts:les.parts,title:les.title,partIndex:0,
     correctCount:0,checkableCount:les.parts.filter(p=>p.type!=='info').length,
@@ -615,6 +667,7 @@ function renderPart(part){
       || '<span class="dim" style="font-size:12px;">Tap lines below to build the order</span>';
     return `<div class="part-kicker">Put it in order</div>
       <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
       <div class="order-target">${placedHtml}</div>
       <div class="chip-pool">${poolHtml}</div>`;
   }
@@ -642,6 +695,7 @@ function renderPart(part){
     }).join('');
     return `<div class="part-kicker">Match the pairs</div>
       <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
       <p class="dim" style="font-size:12px;">Tap an item on the left, then its match on the right. Tap a matched item to undo it.</p>
       <div style="display:flex;gap:14px;">
         <div class="option-list" style="flex:1;">${leftHtml}</div>
@@ -670,6 +724,7 @@ function renderPart(part){
     const checked=state.player.checked;
     return `<div class="part-kicker">Short answer</div>
       <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
       <input type="text" class="text-input" id="shortAnswerInput" data-focus-key="short-answer" value="${esc(state.player.transient.value||'')}" oninput="onShortAnswerInput(this.value)" ${checked?'disabled':''} placeholder="Type your answer">`;
   }
   if(part.type==='spotbug'){
@@ -708,12 +763,14 @@ function renderPart(part){
     }).join('');
     return `<div class="part-kicker">Sort each item</div>
       <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
       <div class="order-target" style="gap:10px;">${itemsHtml}</div>`;
   }
   if(part.type==='reflect'){
     const t=state.player.transient;
     return `<div class="part-kicker">Reflect</div>
       <div class="part-prompt">${esc(part.prompt)}</div>
+      ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
       <textarea class="text-input" style="min-height:100px;" placeholder="Jot down your answer here (not graded, just for you)" oninput="onReflectNotes(this.value)">${esc(t.notes||'')}</textarea>
       ${t.revealed?`<div class="code-block" style="color:var(--text);white-space:pre-wrap;"><strong>Model answer</strong><br>${esc(part.modelAnswer)}</div>`:''}`;
   }
@@ -722,6 +779,7 @@ function renderPart(part){
 function selectClassify(i,ci){
   if(state.player.checked) return;
   state.player.transient.selections[i]=ci;
+  Sound.click();
   render();
 }
 function onReflectNotes(v){ state.player.transient.notes=v; }
@@ -729,6 +787,7 @@ function toggleMultiselect(i){
   if(state.player.checked) return;
   const t=state.player.transient;
   t.selected = t.selected.includes(i) ? t.selected.filter(x=>x!==i) : [...t.selected,i];
+  Sound.click();
   render();
 }
 function onShortAnswerInput(v){
@@ -736,12 +795,12 @@ function onShortAnswerInput(v){
   const btn=document.getElementById('checkBtn');
   if(btn) btn.disabled = !(v||'').trim().length;
 }
-function selectBugLine(i){ if(state.player.checked) return; state.player.transient.selected=i; render(); }
+function selectBugLine(i){ if(state.player.checked) return; state.player.transient.selected=i; Sound.click(); render(); }
 function matchTapLeft(i){
   if(state.player.checked) return;
   const t=state.player.transient;
   if(t.matched[i]!==undefined){ delete t.matched[i]; render(); return; }
-  t.selectedLeft=i; render();
+  t.selectedLeft=i; Sound.click(); render();
 }
 function matchTapRight(i){
   if(state.player.checked) return;
@@ -751,11 +810,12 @@ function matchTapRight(i){
   if(used) return;
   t.matched[t.selectedLeft]=i;
   t.selectedLeft=null;
+  Sound.click();
   render();
 }
 
-function selectMcq(i){ if(state.player.checked) return; state.player.transient.selected=i; render(); }
-function selectTf(v){ if(state.player.checked) return; state.player.transient.selected=v; render(); }
+function selectMcq(i){ if(state.player.checked) return; state.player.transient.selected=i; Sound.click(); render(); }
+function selectTf(v){ if(state.player.checked) return; state.player.transient.selected=v; Sound.click(); render(); }
 function onFillInput(v){
   state.player.transient.value=v;
   const btn=document.getElementById('checkBtn');
@@ -763,11 +823,11 @@ function onFillInput(v){
 }
 function placeChip(i){
   const t=state.player.transient; const line=t.pool[i];
-  t.pool=t.pool.filter((_,idx)=>idx!==i); t.placed=[...t.placed,line]; render();
+  t.pool=t.pool.filter((_,idx)=>idx!==i); t.placed=[...t.placed,line]; Sound.click(); render();
 }
 function unplaceChip(i){
   const t=state.player.transient; const line=t.placed[i];
-  t.placed=t.placed.filter((_,idx)=>idx!==i); t.pool=[...t.pool,line]; render();
+  t.placed=t.placed.filter((_,idx)=>idx!==i); t.pool=[...t.pool,line]; Sound.click(); render();
 }
 
 function canCheck(part){
@@ -847,6 +907,7 @@ function checkCurrent(forceCorrect){
   if(!p.redemption && correct) p.correctCount++;
   if(!correct) p.wrongQueue.push(part);
   p.checked=true; p.wasCorrect=correct;
+  correct ? Sound.correct() : Sound.wrong();
   render();
 }
 function continuePart(){
@@ -874,6 +935,7 @@ function finishLesson(){
   state.progress.completed[p.langId][p.lessonId]=true;
   state.progress.xp += xp;
   saveProgress();
+  Sound.complete();
   render();
 }
 
@@ -1162,12 +1224,12 @@ function defaultDraftForType(t){
   if(t==='mcq') return {type:'mcq', prompt:'', code:'', options:['',''], correctIndex:0};
   if(t==='multiselect') return {type:'multiselect', prompt:'', code:'', options:['','',''], correctIndexes:[0]};
   if(t==='fill') return {type:'fill', prompt:'', code:'', answer:'', hint:''};
-  if(t==='shortanswer') return {type:'shortanswer', prompt:'', answers:['']};
-  if(t==='order') return {type:'order', prompt:'', lines:['','']};
-  if(t==='match') return {type:'match', prompt:'', pairs:[{left:'',right:''},{left:'',right:''}]};
+  if(t==='shortanswer') return {type:'shortanswer', prompt:'', code:'', answers:['']};
+  if(t==='order') return {type:'order', prompt:'', code:'', lines:['','']};
+  if(t==='match') return {type:'match', prompt:'', code:'', pairs:[{left:'',right:''},{left:'',right:''}]};
   if(t==='spotbug') return {type:'spotbug', prompt:'', lines:['',''], buggyIndex:0, explanation:''};
-  if(t==='classify') return {type:'classify', prompt:'', categories:['',''], items:[{text:'',categoryIndex:0},{text:'',categoryIndex:1}]};
-  if(t==='reflect') return {type:'reflect', prompt:'', modelAnswer:''};
+  if(t==='classify') return {type:'classify', prompt:'', code:'', categories:['',''], items:[{text:'',categoryIndex:0},{text:'',categoryIndex:1}]};
+  if(t==='reflect') return {type:'reflect', prompt:'', code:'', modelAnswer:''};
   if(t==='truefalse') return {type:'truefalse', statement:'', code:'', answer:true};
 }
 function newPartForm(t){state.editing={kind:'part', id:null, draft:defaultDraftForType(t)}; render();}
@@ -1213,6 +1275,7 @@ function renderPartForm(){
     <div class="field"><label>Hint (optional)</label><input type="text" data-focus-key="part-hint" value="${esc(d.hint)}" oninput="setDraftField('hint',this.value)"></div>`;
   } else if(d.type==='shortanswer'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="What keyword defines a function in Python?"></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
     <div class="field"><label>Accepted answers (any of these count)</label>
       ${d.answers.map((a,i)=>`<div class="option-edit-row">
         <span class="dim mono" style="width:16px;">${i+1}</span>
@@ -1223,6 +1286,7 @@ function renderPartForm(){
     </div>`;
   } else if(d.type==='order'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Put these lines in the correct order"></div>
+    <div class="field"><label>Code snippet (optional context, shown above the lines)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
     <div class="field"><label>Lines, in correct order</label>
       ${d.lines.map((l,i)=>`<div class="option-edit-row">
         <span class="dim mono" style="width:16px;">${i+1}</span>
@@ -1233,6 +1297,7 @@ function renderPartForm(){
     </div>`;
   } else if(d.type==='match'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Match each item on the left to the right"></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
     <div class="field"><label>Pairs (left matches right)</label>
       ${d.pairs.map((pr,i)=>`<div class="option-edit-row">
         <span class="dim mono" style="width:16px;">${i+1}</span>
@@ -1255,6 +1320,7 @@ function renderPartForm(){
     <div class="field"><label>Explanation (optional, shown if they get it wrong)</label><input type="text" data-focus-key="part-bug-explain" value="${esc(d.explanation)}" oninput="setDraftField('explanation',this.value)"></div>`;
   } else if(d.type==='classify'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Sort each snippet into the right category"></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
     <div class="field"><label>Category A</label><input type="text" data-focus-key="part-cat-0" value="${esc(d.categories[0])}" oninput="setCategoryText(0,this.value)" placeholder="Valid syntax"></div>
     <div class="field"><label>Category B</label><input type="text" data-focus-key="part-cat-1" value="${esc(d.categories[1])}" oninput="setCategoryText(1,this.value)" placeholder="Syntax error"></div>
     <div class="field"><label>Items</label>
@@ -1270,6 +1336,7 @@ function renderPartForm(){
     </div>`;
   } else if(d.type==='reflect'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Explain in your own words: what is a closure?"></div>
+    <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
     <div class="field"><label>Model answer</label><textarea data-focus-key="part-model-answer" oninput="setDraftField('modelAnswer',this.value)">${esc(d.modelAnswer)}</textarea></div>`;
   } else if(d.type==='truefalse'){
     fields=`<div class="field"><label>Statement</label><input type="text" data-focus-key="part-statement" value="${esc(d.statement)}" oninput="setDraftField('statement',this.value)" placeholder="A for loop always runs exactly 10 times."></div>
@@ -1409,13 +1476,13 @@ const SCHEMA_EXAMPLE = `{
                 {"type": "mcq", "prompt": "What does this print?", "code": "console.log(2+2)", "options": ["4","2+2","NaN"], "correctIndex": 0},
                 {"type": "multiselect", "prompt": "Which of these are valid variable names?", "code": "", "options": ["myVar","2var","_x","let"], "correctIndexes": [0,2]},
                 {"type": "fill", "prompt": "Fill the blank", "code": "___.log('hi')", "answer": "console", "hint": "the global object"},
-                {"type": "shortanswer", "prompt": "What keyword declares a constant?", "answers": ["const"]},
+                {"type": "shortanswer", "prompt": "What keyword declares a constant?", "code": "", "answers": ["const"]},
                 {"type": "truefalse", "statement": "JS is case-sensitive.", "code": "", "answer": true},
-                {"type": "order", "prompt": "Order these lines", "lines": ["function greet() {", "  return 'hi';", "}"]},
-                {"type": "match", "prompt": "Match each term to its meaning", "pairs": [{"left": "int", "right": "whole number type"}, {"left": "str", "right": "text type"}]},
+                {"type": "order", "prompt": "Order these lines", "code": "", "lines": ["function greet() {", "  return 'hi';", "}"]},
+                {"type": "match", "prompt": "Match each term to its meaning", "code": "", "pairs": [{"left": "int", "right": "whole number type"}, {"left": "str", "right": "text type"}]},
                 {"type": "spotbug", "prompt": "Which line has the bug?", "lines": ["function add(a, b) {", "  return a - b;", "}"], "buggyIndex": 1, "explanation": "Should be a + b, not a - b."},
-                {"type": "classify", "prompt": "Sort each snippet", "categories": ["Valid", "Syntax error"], "items": [{"text": "let x = 5;", "categoryIndex": 0}, {"text": "let = 5;", "categoryIndex": 1}]},
-                {"type": "reflect", "prompt": "Explain what a closure is in your own words", "modelAnswer": "A function that remembers variables from where it was created, even after that outer function has finished running."}
+                {"type": "classify", "prompt": "Sort each snippet", "code": "", "categories": ["Valid", "Syntax error"], "items": [{"text": "let x = 5;", "categoryIndex": 0}, {"text": "let = 5;", "categoryIndex": 1}]},
+                {"type": "reflect", "prompt": "Explain what a closure is in your own words", "code": "", "modelAnswer": "A function that remembers variables from where it was created, even after that outer function has finished running."}
               ]
             }
           ]
@@ -1424,7 +1491,8 @@ const SCHEMA_EXAMPLE = `{
     }
   ]
 }
-colors available: blue, gold, mint, coral, pink. IDs can be any unique string - they will be auto-filled if missing.`;
+colors available: blue, gold, mint, coral, pink. IDs can be any unique string - they will be auto-filled if missing.
+"code" is optional on every question type (leave it "" to skip showing a code snippet).`;
 
 function renderCodeEditor(){
   if(state.codeDraft==null) state.codeDraft=JSON.stringify(state.data,null,2);
