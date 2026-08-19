@@ -247,6 +247,13 @@
     padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .2s;}
   .toast.show{opacity:1;}
 
+  /* match connector lines */
+  .match-wrap{position:relative;}
+  .match-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;}
+  .match-cols{position:relative;z-index:2;display:flex;gap:14px;}
+  .match-col{flex:1;display:flex;flex-direction:column;gap:10px;}
+  .match-item{position:relative;}
+
   @media(max-width:560px){
     .topbar{padding:12px 0;}
     .brand-name{font-size:14px;}
@@ -598,6 +605,8 @@ function renderPlayer(){
     </div>
     ${bodyHtml}
   </div>`;
+  const part2=p.finished?null:p.parts[p.partIndex];
+  if(part2 && part2.type==='match') requestAnimationFrame(drawMatchLines);
 }
 function requestExitPlayer(){
   state.pendingDelete={kind:'exitPlayer',label:'Leave this lesson? Your progress on it will not be saved.'};
@@ -675,31 +684,34 @@ function renderPart(part){
     const t=state.player.transient;
     const checked=state.player.checked;
     const leftHtml=part.pairs.map((pr,i)=>{
-      let cls='option';
+      let cls='option match-item';
       const isMatched= t.matched[i]!==undefined;
       if(checked){
         if(isMatched && t.matched[i]===i) cls+=' correct';
         else if(isMatched) cls+=' wrong';
       } else if(isMatched || t.selectedLeft===i) cls+=' selected';
-      return `<button class="${cls}" ${checked?'disabled':''} onclick="matchTapLeft(${i})">${esc(pr.left)}</button>`;
+      return `<button class="${cls}" data-side="left" data-idx="${i}" ${checked?'disabled':''} onclick="matchTapLeft(${i})">${esc(pr.left)}</button>`;
     }).join('');
     const rightHtml=(t.rightOrder||[]).map(ri=>{
       const pr=part.pairs[ri];
       const matchedLeft=Object.keys(t.matched).find(l=>t.matched[l]===ri);
-      let cls='option';
+      let cls='option match-item';
       if(checked){
         if(matchedLeft!==undefined && Number(matchedLeft)===ri) cls+=' correct';
         else if(matchedLeft!==undefined) cls+=' wrong';
       } else if(matchedLeft!==undefined) cls+=' selected';
-      return `<button class="${cls}" ${checked?'disabled':''} onclick="matchTapRight(${ri})">${esc(pr.right)}</button>`;
+      return `<button class="${cls}" data-side="right" data-idx="${ri}" ${checked?'disabled':''} onclick="matchTapRight(${ri})">${esc(pr.right)}</button>`;
     }).join('');
     return `<div class="part-kicker">Match the pairs</div>
       <div class="part-prompt">${esc(part.prompt)}</div>
       ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
-      <p class="dim" style="font-size:12px;">Tap an item on the left, then its match on the right. Tap a matched item to undo it.</p>
-      <div style="display:flex;gap:14px;">
-        <div class="option-list" style="flex:1;">${leftHtml}</div>
-        <div class="option-list" style="flex:1;">${rightHtml}</div>
+      <p class="dim" style="font-size:12px;">Tap an item on the left, then its match on the right. A line will connect them so you can see what's paired. Tap a matched item to undo it.</p>
+      <div class="match-wrap" id="matchWrap">
+        <svg class="match-svg" id="matchSvg"></svg>
+        <div class="match-cols">
+          <div class="match-col">${leftHtml}</div>
+          <div class="match-col">${rightHtml}</div>
+        </div>
       </div>`;
   }
   if(part.type==='multiselect'){
@@ -758,7 +770,7 @@ function renderPart(part){
       }).join('');
       return `<div class="order-line" style="flex-direction:column;align-items:stretch;gap:8px;">
         <div class="mono" style="font-size:13px;">${esc(it.text)}</div>
-        <div style="display:flex;gap:8px;">${btns}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${btns}</div>
       </div>`;
     }).join('');
     return `<div class="part-kicker">Sort each item</div>
@@ -776,6 +788,45 @@ function renderPart(part){
   }
   return '';
 }
+/* Draw an SVG line between every matched left/right button in the "match"
+   question, so people can see at a glance what's paired with what instead
+   of having to remember. Redrawn any time the match part re-renders. */
+function drawMatchLines(){
+  const wrap=document.getElementById('matchWrap');
+  const svg=document.getElementById('matchSvg');
+  if(!wrap || !svg) return;
+  const p=state.player; if(!p) return;
+  const part=p.parts[p.partIndex];
+  if(!part || part.type!=='match') return;
+  const t=p.transient;
+  const wrapRect=wrap.getBoundingClientRect();
+  svg.setAttribute('width', wrapRect.width);
+  svg.setAttribute('height', wrapRect.height);
+  svg.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`);
+  let linesHtml='';
+  Object.keys(t.matched).forEach(leftIdx=>{
+    const rightIdx=t.matched[leftIdx];
+    const leftEl=wrap.querySelector(`.match-item[data-side="left"][data-idx="${leftIdx}"]`);
+    const rightEl=wrap.querySelector(`.match-item[data-side="right"][data-idx="${rightIdx}"]`);
+    if(!leftEl || !rightEl) return;
+    const lr=leftEl.getBoundingClientRect(), rr=rightEl.getBoundingClientRect();
+    const x1=lr.right-wrapRect.left, y1=lr.top-wrapRect.top+lr.height/2;
+    const x2=rr.left-wrapRect.left, y2=rr.top-wrapRect.top+rr.height/2;
+    let stroke='var(--accent)';
+    if(p.checked){
+      stroke = Number(leftIdx)===rightIdx ? 'var(--mint)' : 'var(--coral)';
+    }
+    const midX=(x1+x2)/2;
+    linesHtml+=`<path d="M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}" stroke="${stroke}" stroke-width="2.5" fill="none" opacity="0.85"/>`;
+    linesHtml+=`<circle cx="${x1}" cy="${y1}" r="4" fill="${stroke}"/><circle cx="${x2}" cy="${y2}" r="4" fill="${stroke}"/>`;
+  });
+  svg.innerHTML=linesHtml;
+}
+window.addEventListener('resize', ()=>{
+  if(state.player && !state.player.finished && state.player.parts[state.player.partIndex] && state.player.parts[state.player.partIndex].type==='match'){
+    drawMatchLines();
+  }
+});
 function selectClassify(i,ci){
   if(state.player.checked) return;
   state.player.transient.selections[i]=ci;
@@ -1321,14 +1372,19 @@ function renderPartForm(){
   } else if(d.type==='classify'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Sort each snippet into the right category"></div>
     <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
-    <div class="field"><label>Category A</label><input type="text" data-focus-key="part-cat-0" value="${esc(d.categories[0])}" oninput="setCategoryText(0,this.value)" placeholder="Valid syntax"></div>
-    <div class="field"><label>Category B</label><input type="text" data-focus-key="part-cat-1" value="${esc(d.categories[1])}" oninput="setCategoryText(1,this.value)" placeholder="Syntax error"></div>
+    <div class="field"><label>Categories</label>
+      ${d.categories.map((cat,ci)=>`<div class="option-edit-row">
+        <span class="dim mono" style="width:16px;">${ci+1}</span>
+        <input type="text" data-focus-key="part-cat-${ci}" value="${esc(cat)}" oninput="setCategoryText(${ci},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addCategoryViaEnter();}" placeholder="${ci===0?'Valid syntax':(ci===1?'Syntax error':'Category '+(ci+1))}">
+        <button class="btn btn-icon btn-sm btn-danger" onclick="removeCategory(${ci})" ${d.categories.length<=2?'disabled':''}>&#10005;</button>
+      </div>`).join('')}
+      <button class="btn btn-sm" onclick="addCategory()">+ Add category</button>
+    </div>
     <div class="field"><label>Items</label>
       ${d.items.map((it,i)=>`<div class="option-edit-row">
         <input type="text" data-focus-key="part-item-${i}" value="${esc(it.text)}" oninput="setItemText(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addItemViaEnter();}" placeholder="item">
-        <select onchange="setItemCategory(${i},this.value)" style="max-width:140px;">
-          <option value="0" ${it.categoryIndex===0?'selected':''}>${esc(d.categories[0]||'Category A')}</option>
-          <option value="1" ${it.categoryIndex===1?'selected':''}>${esc(d.categories[1]||'Category B')}</option>
+        <select onchange="setItemCategory(${i},this.value)" style="max-width:160px;">
+          ${d.categories.map((cat,ci)=>`<option value="${ci}" ${it.categoryIndex===ci?'selected':''}>${esc(cat||'Category '+(ci+1))}</option>`).join('')}
         </select>
         <button class="btn btn-icon btn-sm btn-danger" onclick="removeItem(${i})" ${d.items.length<=2?'disabled':''}>&#10005;</button>
       </div>`).join('')}
@@ -1398,6 +1454,27 @@ function removeBugLine(i){
   render();
 }
 function setCategoryText(i,v){state.editing.draft.categories[i]=v; render();}
+function addCategory(){
+  const d=state.editing.draft;
+  d.categories.push('');
+  render();
+}
+function addCategoryViaEnter(){
+  const d=state.editing.draft; d.categories.push(''); render();
+  const el=document.querySelector(`[data-focus-key="part-cat-${d.categories.length-1}"]`); if(el) el.focus();
+}
+function removeCategory(ci){
+  const d=state.editing.draft; if(d.categories.length<=2) return;
+  d.categories.splice(ci,1);
+  // Any items pointing at the removed category fall back to category 0;
+  // items pointing past it shift down by one so they still point at the
+  // same category after the removal.
+  d.items.forEach(it=>{
+    if(it.categoryIndex===ci) it.categoryIndex=0;
+    else if(it.categoryIndex>ci) it.categoryIndex--;
+  });
+  render();
+}
 function setItemText(i,v){state.editing.draft.items[i].text=v; render();}
 function setItemCategory(i,v){state.editing.draft.items[i].categoryIndex=Number(v); render();}
 function addItem(){state.editing.draft.items.push({text:'',categoryIndex:0}); render();}
@@ -1481,7 +1558,7 @@ const SCHEMA_EXAMPLE = `{
                 {"type": "order", "prompt": "Order these lines", "code": "", "lines": ["function greet() {", "  return 'hi';", "}"]},
                 {"type": "match", "prompt": "Match each term to its meaning", "code": "", "pairs": [{"left": "int", "right": "whole number type"}, {"left": "str", "right": "text type"}]},
                 {"type": "spotbug", "prompt": "Which line has the bug?", "lines": ["function add(a, b) {", "  return a - b;", "}"], "buggyIndex": 1, "explanation": "Should be a + b, not a - b."},
-                {"type": "classify", "prompt": "Sort each snippet", "code": "", "categories": ["Valid", "Syntax error"], "items": [{"text": "let x = 5;", "categoryIndex": 0}, {"text": "let = 5;", "categoryIndex": 1}]},
+                {"type": "classify", "prompt": "Sort each snippet", "code": "", "categories": ["Valid", "Syntax error", "Runtime error"], "items": [{"text": "let x = 5;", "categoryIndex": 0}, {"text": "let = 5;", "categoryIndex": 1}, {"text": "null.length", "categoryIndex": 2}]},
                 {"type": "reflect", "prompt": "Explain what a closure is in your own words", "code": "", "modelAnswer": "A function that remembers variables from where it was created, even after that outer function has finished running."}
               ]
             }
@@ -1492,7 +1569,8 @@ const SCHEMA_EXAMPLE = `{
   ]
 }
 colors available: blue, gold, mint, coral, pink. IDs can be any unique string - they will be auto-filled if missing.
-"code" is optional on every question type (leave it "" to skip showing a code snippet).`;
+"code" is optional on every question type (leave it "" to skip showing a code snippet).
+"classify" supports any number of categories (2 or more) - just add more strings to the "categories" array.`;
 
 function renderCodeEditor(){
   if(state.codeDraft==null) state.codeDraft=JSON.stringify(state.data,null,2);
