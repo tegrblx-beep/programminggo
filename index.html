@@ -254,6 +254,22 @@
   .match-col{flex:1;display:flex;flex-direction:column;gap:10px;}
   .match-item{position:relative;}
 
+  /* python code question */
+  .py-code-editor{width:100%;min-height:150px;background:#12141d;border:2px solid var(--border);border-radius:12px;
+    padding:14px;font-family:var(--font-display);font-size:13.5px;line-height:1.6;color:#e8eaf3;resize:vertical;tab-size:4;}
+  .py-code-editor:focus{outline:none;border-color:var(--accent);}
+  .py-console-label{font-family:var(--font-display);color:var(--text-dim);font-size:11px;text-transform:uppercase;
+    letter-spacing:.06em;margin:14px 0 6px;}
+  .py-console{background:#0e1017;border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+    font-family:var(--font-display);font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    overflow-x:auto;min-height:20px;color:#e8eaf3;}
+  .py-console .line{display:block;}
+  .py-console .dim{color:var(--text-dim);}
+  .py-console.err{border-color:var(--coral);background:var(--coral-dark);color:var(--coral-text);}
+  .py-run-row{display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .py-status{font-family:var(--font-display);font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;}
+  .py-spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--elev3);border-top-color:var(--accent);animation:spin .7s linear infinite;flex-shrink:0;}
+
   @media(max-width:560px){
     .topbar{padding:12px 0;}
     .brand-name{font-size:14px;}
@@ -267,6 +283,12 @@
 </head>
 <body>
 <div id="app"><div class="loading-screen"><div class="spinner"></div><p class="muted mono" style="font-size:13px;">loading codepath...</p></div></div>
+
+<!-- Skulpt runs Python entirely in the browser (no server needed) so the
+     "code" question type can actually execute what the learner types and
+     check the real output. -->
+<script src="https://skulpt.org/js/skulpt.min.js"></script>
+<script src="https://skulpt.org/js/skulpt-stdlib.js"></script>
 
 <script>
 /* ---------- ids / helpers ---------- */
@@ -572,6 +594,11 @@ function enterPart(i){
   if(part && part.type==='spotbug'){p.transient.selected=null;}
   if(part && part.type==='classify'){p.transient.selections=new Array(part.items.length).fill(null);}
   if(part && part.type==='reflect'){p.transient.notes=''; p.transient.revealed=false;}
+  if(part && part.type==='code'){
+    p.transient.code = part.starterCode||'';
+    p.transient.output=''; p.transient.errorMsg=null;
+    p.transient.running=false; p.transient.ranOnce=false;
+  }
   if(part && part.type==='match'){
     p.transient.rightOrder=shuffle(part.pairs.map((pr,idx)=>idx));
     p.transient.matched={};
@@ -787,6 +814,29 @@ function renderPart(part){
       ${part.code?`<div class="code-block">${esc(part.code)}</div>`:''}
       <div class="order-target" style="gap:10px;">${itemsHtml}</div>`;
   }
+  if(part.type==='code'){
+    const t=state.player.transient;
+    const checked=state.player.checked;
+    let outputHtml='';
+    if(t.ranOnce){
+      if(t.errorMsg){
+        outputHtml=`<div class="py-console-label">Output</div><div class="py-console err">${esc(t.errorMsg)}</div>`;
+      } else {
+        const raw=(t.output||'').replace(/\n+$/,'');
+        const lines=raw.length? raw.split('\n') : [];
+        const linesHtml=lines.length
+          ? lines.map(l=>`<span class="line">${colorizePyLine(l)}</span>`).join('')
+          : '<span class="line dim">(no output)</span>';
+        outputHtml=`<div class="py-console-label">Output</div><div class="py-console">${linesHtml}</div>`;
+      }
+    }
+    return `<div class="part-kicker">Write code</div>
+      <div class="part-prompt">${esc(part.prompt)}</div>
+      <textarea class="py-code-editor" data-focus-key="py-code-editor" spellcheck="false" autocapitalize="off" autocorrect="off"
+        oninput="onCodeEdit(this.value)" ${checked?'disabled':''}>${esc(t.code!=null?t.code:(part.starterCode||''))}</textarea>
+      ${part.hint && !t.ranOnce?`<div class="dim" style="font-size:12px;">Hint: ${esc(part.hint)}</div>`:''}
+      ${outputHtml}`;
+  }
   if(part.type==='reflect'){
     const t=state.player.transient;
     return `<div class="part-kicker">Reflect</div>
@@ -836,6 +886,71 @@ window.addEventListener('resize', ()=>{
     drawMatchLines();
   }
 });
+
+/* ---------- python "code" question (runs in-browser via Skulpt) ---------- */
+function onCodeEdit(v){ if(state.player) state.player.transient.code=v; }
+function skBuiltinRead(x){
+  if(Sk.builtinFiles===undefined || Sk.builtinFiles["files"][x]===undefined) throw "File not found: '"+x+"'";
+  return Sk.builtinFiles["files"][x];
+}
+/* Lightly syntax-highlights one line of printed output: quoted strings,
+   numbers, and True/False/None each get their own color so the console
+   doesn't read as one flat block of text. Kept intentionally simple since
+   it's coloring plain program OUTPUT, not real Python source. */
+function colorizePyLine(line){
+  const tokenRe=/('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|\b\d+\.\d+\b|\b\d+\b|\bTrue\b|\bFalse\b|\bNone\b)/g;
+  let result=''; let lastIndex=0; let m;
+  while((m=tokenRe.exec(line))){
+    result+=esc(line.slice(lastIndex,m.index));
+    const tok=m[0];
+    let color='var(--gold-text)';
+    if(/^['"]/.test(tok)) color='var(--gold-text)';
+    else if(/^(True|False|None)$/.test(tok)) color='var(--coral-text)';
+    else color='var(--accent-text)';
+    result+=`<span style="color:${color};">${esc(tok)}</span>`;
+    lastIndex=tokenRe.lastIndex;
+  }
+  result+=esc(line.slice(lastIndex));
+  return result.length? result : '&nbsp;';
+}
+async function runAndCheckCode(){
+  const p=state.player; if(!p || p.checked || p.transient.running) return;
+  const part=p.parts[p.partIndex];
+  const t=p.transient;
+  t.running=true; t.ranOnce=false; t.errorMsg=null; t.output='';
+  render();
+  if(typeof Sk==='undefined'){
+    t.running=false; t.ranOnce=true;
+    t.errorMsg='The Python engine failed to load. Check your internet connection and try again.';
+    render();
+    return;
+  }
+  let captured='';
+  try{
+    Sk.configure({
+      output:(txt)=>{ captured+=txt; },
+      read: skBuiltinRead,
+      __future__: Sk.python3,
+      killableWhile:true, killableFor:true
+    });
+    Sk.execLimit=8000;
+    await Sk.misceval.asyncToPromise(()=> Sk.importMainWithBody("<stdin>", false, t.code||'', true));
+    t.output=captured; t.errorMsg=null;
+  } catch(err){
+    t.output=captured;
+    t.errorMsg=(err && err.toString)? err.toString() : 'Error running code';
+  }
+  t.running=false; t.ranOnce=true;
+  const actual=(t.output||'').trim();
+  const expected=(part.expectedOutput||'').trim();
+  const correct = !t.errorMsg && actual===expected;
+  if(!p.redemption && correct) p.correctCount++;
+  if(!correct) p.wrongQueue.push(part);
+  p.checked=true; p.wasCorrect=correct;
+  correct ? Sound.correct() : Sound.wrong();
+  render();
+}
+
 function selectClassify(i,ci){
   if(state.player.checked) return;
   state.player.transient.selections[i]=ci;
@@ -901,6 +1016,7 @@ function canCheck(part){
   if(part.type==='shortanswer') return (t.value||'').trim().length>0;
   if(part.type==='spotbug') return t.selected!=null;
   if(part.type==='classify') return (t.selections||[]).every(s=>s!=null);
+  if(part.type==='code') return true;
   return true;
 }
 function computeCorrect(part,t){
@@ -938,6 +1054,12 @@ function renderPlayerFooter(part){
           <button class="btn btn-primary btn-block" onclick="checkCurrent(true)">Got it right</button>
         </div>`;
     }
+    if(part.type==='code'){
+      if(p.transient.running){
+        return `<div class="py-status"><div class="py-spinner"></div> Running your code&hellip;</div>`;
+      }
+      return `<button class="btn btn-primary btn-block" onclick="runAndCheckCode()">Run &amp; Check</button>`;
+    }
     const ok=canCheck(part);
     return `<button id="checkBtn" class="btn btn-primary btn-block" ${ok?'':'disabled'} onclick="checkCurrent()">Check</button>`;
   }
@@ -959,6 +1081,7 @@ function answerHint(part){
   if(part.type==='multiselect') return 'Correct answers: '+part.correctIndexes.map(i=>esc(part.options[i])).join(', ');
   if(part.type==='shortanswer') return 'Correct answer: '+esc(part.answers[0]);
   if(part.type==='spotbug') return 'Line '+(part.buggyIndex+1)+' has the bug.'+(part.explanation?' '+esc(part.explanation):'');
+  if(part.type==='code') return 'Expected output: '+esc(part.expectedOutput||'(nothing)');
   return '';
 }
 function checkCurrent(forceCorrect){
@@ -1244,7 +1367,7 @@ function moveLesson(id,dir){
   Sound.click(); [arr[i],arr[j]]=[arr[j],arr[i]]; saveData(); render();
 }
 
-const PART_TYPE_LABELS={info:'Info screen', mcq:'Multiple choice', multiselect:'Select all that apply', fill:'Fill in the blank', shortanswer:'Short answer', order:'Put in order', match:'Matching pairs', classify:'Sort into categories', spotbug:'Spot the bug', reflect:'Reflect (self-graded)', truefalse:'True / False'};
+const PART_TYPE_LABELS={info:'Info screen', mcq:'Multiple choice', multiselect:'Select all that apply', fill:'Fill in the blank', shortanswer:'Short answer', order:'Put in order', match:'Matching pairs', classify:'Sort into categories', spotbug:'Spot the bug', code:'Write code (Python)', reflect:'Reflect (self-graded)', truefalse:'True / False'};
 function renderLessonBuilder(){
   const lang=getLang(state.builderPath.languageId); const sec=getSection(lang,state.builderPath.sectionId); const les=getLesson(sec,state.builderPath.lessonId);
   if(!les){state.builderPath.lessonId=null; return renderSectionBuilder();}
@@ -1277,6 +1400,7 @@ function partSummary(p){
   if(p.type==='multiselect') return p.prompt;
   if(p.type==='shortanswer') return p.prompt;
   if(p.type==='spotbug') return p.prompt;
+  if(p.type==='code') return p.prompt;
   if(p.type==='classify') return p.prompt;
   if(p.type==='reflect') return p.prompt;
   if(p.type==='truefalse') return p.statement;
@@ -1296,6 +1420,7 @@ function defaultDraftForType(t){
   if(t==='order') return {type:'order', prompt:'', code:'', lines:['','']};
   if(t==='match') return {type:'match', prompt:'', code:'', pairs:[{left:'',right:''},{left:'',right:''}]};
   if(t==='spotbug') return {type:'spotbug', prompt:'', lines:['',''], buggyIndex:0, explanation:''};
+  if(t==='code') return {type:'code', prompt:'', starterCode:'print("Hello, World!")', expectedOutput:'Hello, World!', hint:''};
   if(t==='classify') return {type:'classify', prompt:'', code:'', categories:['',''], items:[{text:'',categoryIndex:0},{text:'',categoryIndex:1}]};
   if(t==='reflect') return {type:'reflect', prompt:'', code:'', modelAnswer:''};
   if(t==='truefalse') return {type:'truefalse', statement:'', code:'', answer:true};
@@ -1387,6 +1512,11 @@ function renderPartForm(){
       <button class="btn btn-sm" onclick="addBugLine()">+ Add line</button>
     </div>
     <div class="field"><label>Explanation (optional, shown if they get it wrong)</label><input type="text" data-focus-key="part-bug-explain" value="${esc(d.explanation)}" oninput="setDraftField('explanation',this.value)"></div>`;
+  } else if(d.type==='code'){
+    fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Write a program that prints the numbers 1 to 5"></div>
+    <div class="field"><label>Starter code (Python)</label><textarea data-focus-key="part-startercode" style="min-height:130px;font-family:var(--font-display);" oninput="setDraftField('starterCode',this.value)">${esc(d.starterCode)}</textarea><div class="field-hint">This is the code the learner sees and can edit before running it.</div></div>
+    <div class="field"><label>Expected output</label><textarea data-focus-key="part-expectedoutput" style="font-family:var(--font-display);" oninput="setDraftField('expectedOutput',this.value)">${esc(d.expectedOutput)}</textarea><div class="field-hint">Compared exactly (leading/trailing whitespace ignored) to what the code actually prints when run. Leave blank if it should print nothing.</div></div>
+    <div class="field"><label>Hint (optional)</label><input type="text" data-focus-key="part-code-hint" value="${esc(d.hint)}" oninput="setDraftField('hint',this.value)"></div>`;
   } else if(d.type==='classify'){
     fields=`<div class="field"><label>Prompt</label><input type="text" data-focus-key="part-prompt" value="${esc(d.prompt)}" oninput="setDraftField('prompt',this.value)" placeholder="Sort each snippet into the right category"></div>
     <div class="field"><label>Code snippet (optional)</label><textarea data-focus-key="part-code" oninput="setDraftField('code',this.value)">${esc(d.code)}</textarea></div>
@@ -1525,6 +1655,7 @@ function validatePartDraft(d){
   if(d.type==='order') return d.prompt.trim() && d.lines.every(l=>l.trim());
   if(d.type==='match') return d.prompt.trim() && d.pairs.every(pr=>pr.left.trim() && pr.right.trim());
   if(d.type==='spotbug') return d.prompt.trim() && d.lines.length>=2 && d.lines.every(l=>l.trim());
+  if(d.type==='code') return d.prompt.trim().length>0;
   if(d.type==='classify') return d.prompt.trim() && d.categories.every(c=>c.trim()) && d.items.length>=2 && d.items.every(it=>it.text.trim());
   if(d.type==='reflect') return d.prompt.trim() && d.modelAnswer.trim();
   if(d.type==='truefalse') return d.statement.trim();
@@ -1579,7 +1710,8 @@ const SCHEMA_EXAMPLE = `{
                 {"type": "match", "prompt": "Match each term to its meaning", "code": "", "pairs": [{"left": "int", "right": "whole number type"}, {"left": "str", "right": "text type"}]},
                 {"type": "spotbug", "prompt": "Which line has the bug?", "lines": ["function add(a, b) {", "  return a - b;", "}"], "buggyIndex": 1, "explanation": "Should be a + b, not a - b."},
                 {"type": "classify", "prompt": "Sort each snippet", "code": "", "categories": ["Valid", "Syntax error", "Runtime error"], "items": [{"text": "let x = 5;", "categoryIndex": 0}, {"text": "let = 5;", "categoryIndex": 1}, {"text": "null.length", "categoryIndex": 2}]},
-                {"type": "reflect", "prompt": "Explain what a closure is in your own words", "code": "", "modelAnswer": "A function that remembers variables from where it was created, even after that outer function has finished running."}
+                {"type": "reflect", "prompt": "Explain what a closure is in your own words", "code": "", "modelAnswer": "A function that remembers variables from where it was created, even after that outer function has finished running."},
+                {"type": "code", "prompt": "Write a program that prints the numbers 1 to 3, one per line", "starterCode": "for i in range(1, 4):\n    print(i)", "expectedOutput": "1\n2\n3", "hint": "range(1, 4) gives 1, 2, 3"}
               ]
             }
           ]
@@ -1590,7 +1722,10 @@ const SCHEMA_EXAMPLE = `{
 }
 colors available: blue, gold, mint, coral, pink. IDs can be any unique string - they will be auto-filled if missing.
 "code" is optional on every question type (leave it "" to skip showing a code snippet).
-"classify" supports any number of categories (2 or more) - just add more strings to the "categories" array.`;
+"classify" supports any number of categories (2 or more) - just add more strings to the "categories" array.
+The "code" question type (Write code) is Python-only for now: "starterCode" is what the learner edits, and it's actually
+run in the browser (via Skulpt) - "expectedOutput" is compared exactly against whatever the program prints, ignoring
+leading/trailing whitespace.`;
 
 function renderCodeEditor(){
   if(state.codeDraft==null) state.codeDraft=JSON.stringify(state.data,null,2);
